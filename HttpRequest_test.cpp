@@ -671,10 +671,3 @@ TEST(HttpRequest_TestDirectSettersAndGetters) {
     ASSERT_EQ(req.getContentLength(), 9999u);
 }
 
-// =============================================================================
-// Main Test Runner Entry Point
-// =============================================================================
-
-int main() {
-    return RUN_ALL_TESTS();
-}
