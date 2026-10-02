@@ -316,6 +316,8 @@ TEST(HttpResponse_TestSetHeaderOverwrite) {
     ASSERT_TRUE(responseStr.find("Content-Length: 100\r\n") == std::string::npos);
 }
 
+/* This might be an issue. Order of multple headers with the same name should be preserved. 
+https://stackoverflow.com/questions/750330/does-the-order-of-headers-in-an-http-response-ever-matter*/  
 TEST(HttpResponse_TestSetHeaderLexicographicalSorting) {
     // std::map sorts keys alphabetically by ASCII value
     HttpResponse resp;
