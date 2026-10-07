@@ -1,6 +1,7 @@
 # Running tests
 
-`make run_client`    - Runs 72 Client tests  
-`make run_request`   - Runs 30 HttpRequest tests  
-`make run_response`  - Runs 52 HttpResponse tests  
-`make run`           - Runs all 154 tests across all suites  
+`make run_client`    - Runs Client tests  
+`make run_request`   - Runs HttpRequest tests  
+`make run_response`  - Runs HttpResponse tests  
+`make run_config`    - Runs ConfigParser tests  
+`make run`           - Runs all tests across all suites  
