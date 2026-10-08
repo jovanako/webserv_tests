@@ -1,3 +1,14 @@
 test_runner
 test_request
 test_response
+test_location_config
+test_server_config
+test_config
+test_client_unit
+test_client_integration
+test_client
+*.gcno
+*.gcda
+*.gcov
+coverage_report/
+coverage.xml

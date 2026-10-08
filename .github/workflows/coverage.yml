@@ -1,0 +1,46 @@
+name: Tests & Coverage
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout webserv_tests
+        uses: actions/checkout@v4
+        with:
+          path: webserv_tests
+
+      - name: Checkout webserv
+        uses: actions/checkout@v4
+        with:
+          repository: jovanako/webserv
+          token: ${{ secrets.WEBSERV_ACCESS_TOKEN || github.token }}
+          path: webserv
+
+      - name: Install gcovr
+        run: sudo apt-get update && sudo apt-get install -y gcovr
+
+      - name: Run tests with coverage
+        working-directory: webserv_tests
+        run: |
+          make coverage
+          echo "## 📊 Test Coverage" >> $GITHUB_STEP_SUMMARY
+          gcovr --root ../webserv --object-directory . --markdown >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate HTML coverage report
+        if: always()
+        working-directory: webserv_tests
+        run: make coverage_html
+
+      - name: Upload HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: webserv_tests/coverage_report/
+

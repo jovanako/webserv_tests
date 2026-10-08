@@ -1,5 +1,6 @@
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98
+COVERAGE_FLAGS = --coverage -O0 -g
 INCLUDES = -I. -I../webserv
 
 MAIN_SRC = main.cpp
@@ -89,11 +90,34 @@ run_client_integration: test_client_integration
 run_client: test_client
 	./test_client
 
+coverage: fclean
+	$(CXX) $(CXXFLAGS) $(COVERAGE_FLAGS) $(INCLUDES) $(SRCS) -o $(NAME)
+	./$(NAME)
+	@if command -v gcovr >/dev/null 2>&1; then \
+		gcovr --root ../webserv --object-directory . --print-summary; \
+	else \
+		echo "\n=== CODE COVERAGE (../webserv) ==="; \
+		for src in $(WEBSERV_COMMON); do \
+			base=$$(basename $$src .cpp); \
+			if [ -f "$(NAME)-$$base.gcda" ]; then \
+				gcov "$(NAME)-$$base"; \
+			elif [ -f "$$base.gcda" ]; then \
+				gcov "$$base"; \
+			fi; \
+		done | grep -A 2 "File '\.\./webserv/"; \
+		rm -f *.h.gcov *.tcc.gcov new.gcov; \
+	fi
+
+coverage_html: coverage
+	mkdir -p coverage_report
+	gcovr --root ../webserv --object-directory . --html-details coverage_report/index.html
+
 clean:
 	rm -f $(NAME) test_request test_response test_location_config test_server_config test_config test_client_unit test_client_integration test_client
+	rm -rf *.gcno *.gcda *.gcov coverage_report coverage.xml
 
 fclean: clean
 
 re: fclean all
 
-.PHONY: all run run_request run_response run_location_config run_server_config run_config run_client_unit run_client_integration run_client clean fclean re
+.PHONY: all run run_request run_response run_location_config run_server_config run_config run_client_unit run_client_integration run_client coverage coverage_html clean fclean re
