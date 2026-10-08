@@ -33,8 +33,12 @@ jobs:
         working-directory: webserv_tests
         run: |
           make coverage
-          echo "## 📊 Test Coverage" >> $GITHUB_STEP_SUMMARY
-          gcovr --root ../webserv --object-directory . --markdown >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 📊 Test Coverage"
+            echo '```text'
+            gcovr --root ../webserv --object-directory .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate HTML coverage report
         if: always()
