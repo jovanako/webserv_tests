@@ -11,16 +11,16 @@ on:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout webserv_tests
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: webserv_tests
 
       - name: Checkout webserv
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: jovanako/webserv
           token: ${{ secrets.WEBSERV_ACCESS_TOKEN || github.token }}
@@ -39,11 +39,13 @@ jobs:
       - name: Generate HTML coverage report
         if: always()
         working-directory: webserv_tests
-        run: make coverage_html
+        run: |
+          mkdir -p coverage_report
+          gcovr --root ../webserv --object-directory . --html-details coverage_report/index.html
 
       - name: Upload HTML coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html-report
           path: webserv_tests/coverage_report/
