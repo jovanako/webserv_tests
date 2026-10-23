@@ -7,6 +7,7 @@ test_config
 test_client_unit
 test_client_integration
 test_client
+test_cgi_request
 *.gcno
 *.gcda
 *.gcov
