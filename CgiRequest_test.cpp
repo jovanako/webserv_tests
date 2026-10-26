@@ -445,6 +445,65 @@ TEST(CgiRequest_TestPathInfoAbsentWhenNoExtraPath) {
     ASSERT_FALSE(hasEnvKey(envVars, "PATH_TRANSLATED"));
 }
 
+TEST(CgiRequest_TestPathTranslatedWithTrailingSlashInLocationRoot) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    loc.setRoot("/var/www/cgi/");
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/script.py/users/profile");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "/users/profile");
+    ASSERT_TRUE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    ASSERT_EQ(getEnvValue(envVars, "PATH_TRANSLATED"), "/var/www/cgi/users/profile");
+}
+
+TEST(CgiRequest_TestPathTranslatedTrailingSlashOnlyAfterScript) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation(); // root: /var/www/cgi
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/script.py/");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_EQ(cgi.getScriptPath(), "/var/www/cgi/script.py");
+    ASSERT_EQ(getEnvValue(envVars, "SCRIPT_NAME"), "/cgi-bin/script.py");
+    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "/");
+    ASSERT_TRUE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    ASSERT_EQ(getEnvValue(envVars, "PATH_TRANSLATED"), "/var/www/cgi/");
+}
+
+TEST(CgiRequest_TestPathTranslatedNestedSubdirectoryScriptResolvesAgainstRoot) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation(); // path: /cgi-bin, root: /var/www/cgi
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/admin/tools/report.py/2026/summary");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_EQ(cgi.getScriptPath(), "/var/www/cgi/admin/tools/report.py");
+    ASSERT_EQ(cgi.getWorkingDirectory(), "/var/www/cgi/admin/tools");
+    ASSERT_EQ(getEnvValue(envVars, "SCRIPT_NAME"), "/cgi-bin/admin/tools/report.py");
+    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "/2026/summary");
+    ASSERT_TRUE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    ASSERT_EQ(getEnvValue(envVars, "PATH_TRANSLATED"), "/var/www/cgi/2026/summary");
+}
+
+TEST(CgiRequest_TestPathTranslatedWithEmptyLocationRoot) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    loc.setRoot("");
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/script.py/extra/info");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "/extra/info");
+    ASSERT_TRUE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    ASSERT_EQ(getEnvValue(envVars, "PATH_TRANSLATED"), "/extra/info");
+}
+
 // =============================================================================
 // 4. CGI Environment Variables (getEnvVars)
 // =============================================================================
