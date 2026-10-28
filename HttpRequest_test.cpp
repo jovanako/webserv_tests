@@ -257,11 +257,11 @@ TEST(HttpRequest_TestSetUriPercentDecoding) {
     ASSERT_EQ(req2.getUri(), "/test/slash/another");
     ASSERT_EQ(req2.getErrorCode(), 0);
 
-    // Query string percent-decoding
+    // Query string is NOT percent-decoded (kept raw for CGI / application parsing)
     HttpRequest req3;
     req3.setUri("/profile?user=John%20Doe&comment=%3Chello%3E");
     ASSERT_EQ(req3.getUri(), "/profile");
-    ASSERT_EQ(req3.getQueryString(), "user=John Doe&comment=<hello>");
+    ASSERT_EQ(req3.getQueryString(), "user=John%20Doe&comment=%3Chello%3E");
     ASSERT_EQ(req3.getErrorCode(), 0);
 }
 
