@@ -5,7 +5,8 @@ INCLUDES = -I. -I../webserv -I../webserv/Client
 
 MAIN_SRC = main.cpp
 
-WEBSERV_COMMON = ../webserv/HttpRequest.cpp \
+WEBSERV_COMMON = ../webserv/RequestBody.cpp \
+                 ../webserv/HttpRequest.cpp \
                  ../webserv/HttpResponse.cpp \
                  ../webserv/ServerConfig.cpp \
                  ../webserv/LocationConfig.cpp \
@@ -16,14 +17,14 @@ WEBSERV_COMMON = ../webserv/HttpRequest.cpp \
                  ../webserv/Client/RequestHandler.cpp \
                  ../webserv/Client/ResponseBuilder.cpp
 
-HTTP_REQUEST_SRCS = HttpRequest_test.cpp ../webserv/HttpRequest.cpp ../webserv/LocationConfig.cpp
+HTTP_REQUEST_SRCS = HttpRequest_test.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/LocationConfig.cpp
 HTTP_RESPONSE_SRCS = HttpResponse_test.cpp ../webserv/HttpResponse.cpp
 LOCATION_CONFIG_SRCS = LocationConfig_test.cpp ../webserv/LocationConfig.cpp
 SERVER_CONFIG_SRCS = ServerConfig_test.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp
 CONFIG_PARSER_SRCS = ConfigParser_test.cpp ../webserv/ConfigParser.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp
-CGI_REQUEST_SRCS = CgiRequest_test.cpp ../webserv/CgiRequest.cpp ../webserv/ServerConfig.cpp ../webserv/HttpRequest.cpp ../webserv/LocationConfig.cpp
+CGI_REQUEST_SRCS = CgiRequest_test.cpp ../webserv/CgiRequest.cpp ../webserv/ServerConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/LocationConfig.cpp
 
-CLIENT_UNIT_SRCS = Client_unit_test.cpp ../webserv/Client/Client.cpp ../webserv/Client/RequestParser.cpp ../webserv/Client/RequestHandler.cpp ../webserv/Client/ResponseBuilder.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp
+CLIENT_UNIT_SRCS = Client_unit_test.cpp ../webserv/Client/Client.cpp ../webserv/Client/RequestParser.cpp ../webserv/Client/RequestHandler.cpp ../webserv/Client/ResponseBuilder.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp
 CLIENT_INTEG_SRCS = Client_integration_test.cpp $(WEBSERV_COMMON)
 CLIENT_SRCS = Client_unit_test.cpp Client_integration_test.cpp $(WEBSERV_COMMON)
 

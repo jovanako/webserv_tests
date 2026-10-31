@@ -3,6 +3,32 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <fstream>
+#include <sstream>
+#include <cstdio>
+#include <unistd.h>
+
+namespace {
+
+std::string readBodyContent(const RequestBody& body) {
+    int fd = body.getFd();
+    if (fd < 0 || body.empty()) {
+        return "";
+    }
+    if (!body.rewind()) {
+        return "";
+    }
+    std::string result;
+    char buffer[4096];
+    ssize_t bytesRead;
+    while ((bytesRead = read(fd, buffer, sizeof(buffer))) > 0) {
+        result.append(buffer, static_cast<size_t>(bytesRead));
+    }
+    body.rewind();
+    return result;
+}
+
+} // namespace
 
 // =============================================================================
 // 1. Initial State & Constructors
@@ -18,6 +44,8 @@ TEST(HttpRequest_TestInitialState) {
     ASSERT_EQ(req.getVersion(), "");
     ASSERT_TRUE(req.getHeaders().empty());
     ASSERT_TRUE(req.getBody().empty());
+    ASSERT_EQ(req.getBody().getSize(), 0u);
+    ASSERT_EQ(req.getBody().getFd(), -1);
     ASSERT_EQ(req.getContentLength(), 0u);
     ASSERT_EQ(req.getErrorCode(), 0);
     ASSERT_FALSE(req.isChunked());
@@ -43,15 +71,18 @@ TEST(HttpRequest_TestCopyConstructor) {
     ASSERT_EQ(copy.getVersion(), "HTTP/1.1");
     ASSERT_EQ(copy.getContentLength(), 5u);
     ASSERT_EQ(copy.getErrorCode(), 0);
-    ASSERT_EQ(copy.getBody().size(), 5u);
+    ASSERT_EQ(copy.getBody().getSize(), 5u);
+    ASSERT_NE(copy.getBody().getFd(), -1);
+    ASSERT_NE(copy.getBody().getFd(), original.getBody().getFd());
+    ASSERT_EQ(readBodyContent(copy.getBody()), "hello");
     ASSERT_EQ(copy.getHeaders().size(), 2u);
     ASSERT_EQ(copy.getHeaders().find("content-type")->second, "text/plain");
 
-    // Modify original to verify deep copy independence
+    // Modify original to verify copy size independence
     const char extra[] = "world";
     original.appendBody(extra, 5);
-    ASSERT_EQ(original.getBody().size(), 10u);
-    ASSERT_EQ(copy.getBody().size(), 5u);
+    ASSERT_EQ(original.getBody().getSize(), 10u);
+    ASSERT_EQ(copy.getBody().getSize(), 5u);
 }
 
 TEST(HttpRequest_TestAssignmentOperator) {
@@ -600,7 +631,7 @@ TEST(HttpRequest_TestAddHeaderConflictContentLengthAndTransferEncoding) {
 }
 
 // =============================================================================
-// 6. Body Accumulation & Raw Bytes (appendBody)
+// 6. Body Accumulation & Raw Bytes (appendBody & RequestBody)
 // =============================================================================
 
 TEST(HttpRequest_TestAppendBodyText) {
@@ -609,16 +640,18 @@ TEST(HttpRequest_TestAppendBodyText) {
     const char chunk2[] = ", ";
     const char chunk3[] = "World!";
 
-    req.appendBody(chunk1, 5);
-    ASSERT_EQ(req.getBody().size(), 5u);
+    ASSERT_TRUE(req.appendBody(chunk1, 5));
+    ASSERT_EQ(req.getBody().getSize(), 5u);
+    ASSERT_FALSE(req.getBody().empty());
+    ASSERT_NE(req.getBody().getFd(), -1);
 
-    req.appendBody(chunk2, 2);
-    ASSERT_EQ(req.getBody().size(), 7u);
+    ASSERT_TRUE(req.appendBody(chunk2, 2));
+    ASSERT_EQ(req.getBody().getSize(), 7u);
 
-    req.appendBody(chunk3, 6);
-    ASSERT_EQ(req.getBody().size(), 13u);
+    ASSERT_TRUE(req.appendBody(chunk3, 6));
+    ASSERT_EQ(req.getBody().getSize(), 13u);
 
-    std::string bodyStr(req.getBody().begin(), req.getBody().end());
+    std::string bodyStr = readBodyContent(req.getBody());
     ASSERT_EQ(bodyStr, "Hello, World!");
 }
 
@@ -627,28 +660,84 @@ TEST(HttpRequest_TestAppendBodyBinaryAndNullBytes) {
     const char binaryData[] = {'\x00', 'A', '\x00', 'B', '\xFF', '\x7F'};
     size_t dataSize = sizeof(binaryData);
 
-    req.appendBody(binaryData, dataSize);
-    ASSERT_EQ(req.getBody().size(), dataSize);
+    ASSERT_TRUE(req.appendBody(binaryData, dataSize));
+    ASSERT_EQ(req.getBody().getSize(), dataSize);
+
+    std::string bodyStr = readBodyContent(req.getBody());
+    ASSERT_EQ(bodyStr.size(), dataSize);
 
     // Verify raw bytes are not null-truncated
-    ASSERT_EQ(req.getBody()[0], '\x00');
-    ASSERT_EQ(req.getBody()[1], 'A');
-    ASSERT_EQ(req.getBody()[2], '\x00');
-    ASSERT_EQ(req.getBody()[3], 'B');
-    ASSERT_EQ(req.getBody()[4], '\xFF');
-    ASSERT_EQ(req.getBody()[5], '\x7F');
+    ASSERT_EQ(bodyStr[0], '\x00');
+    ASSERT_EQ(bodyStr[1], 'A');
+    ASSERT_EQ(bodyStr[2], '\x00');
+    ASSERT_EQ(bodyStr[3], 'B');
+    ASSERT_EQ(bodyStr[4], '\xFF');
+    ASSERT_EQ(bodyStr[5], '\x7F');
 }
 
 TEST(HttpRequest_TestAppendBodyEdgeCases) {
     HttpRequest req;
 
-    // Passing NULL or size 0 should safely do nothing
-    req.appendBody(NULL, 10);
-    ASSERT_EQ(req.getBody().size(), 0u);
+    // Passing NULL or size 0 should safely do nothing and not open a temp file
+    ASSERT_TRUE(req.appendBody(NULL, 10));
+    ASSERT_EQ(req.getBody().getSize(), 0u);
+    ASSERT_TRUE(req.getBody().empty());
+    ASSERT_EQ(req.getBody().getFd(), -1);
 
     const char data[] = "data";
-    req.appendBody(data, 0);
-    ASSERT_EQ(req.getBody().size(), 0u);
+    ASSERT_TRUE(req.appendBody(data, 0));
+    ASSERT_EQ(req.getBody().getSize(), 0u);
+    ASSERT_TRUE(req.getBody().empty());
+    ASSERT_EQ(req.getBody().getFd(), -1);
+}
+
+TEST(HttpRequest_TestRewindAndResetBody) {
+    HttpRequest req;
+    ASSERT_TRUE(req.rewindBody());
+
+    const char data[] = "temporary payload";
+    ASSERT_TRUE(req.appendBody(data, 17));
+    ASSERT_EQ(req.getBody().getSize(), 17u);
+    ASSERT_FALSE(req.getBody().empty());
+    ASSERT_NE(req.getBody().getFd(), -1);
+    ASSERT_TRUE(req.rewindBody());
+
+    req.resetBody();
+    ASSERT_TRUE(req.getBody().empty());
+    ASSERT_EQ(req.getBody().getSize(), 0u);
+    ASSERT_EQ(req.getBody().getFd(), -1);
+
+    const char newData[] = "fresh";
+    ASSERT_TRUE(req.appendBody(newData, 5));
+    ASSERT_EQ(req.getBody().getSize(), 5u);
+    ASSERT_EQ(readBodyContent(req.getBody()), "fresh");
+}
+
+TEST(HttpRequest_TestBodyWriteToStream) {
+    HttpRequest req;
+    const char payload[] = "stream output test\nline 2";
+    size_t payloadLen = sizeof(payload) - 1;
+    ASSERT_TRUE(req.appendBody(payload, payloadLen));
+
+    std::ostringstream pathStream;
+    pathStream << "/tmp/webserv_test_writeto_" << getpid();
+    std::string tempOutPath = pathStream.str();
+
+    {
+        std::ofstream outFile(tempOutPath.c_str(), std::ios::out | std::ios::binary);
+        ASSERT_TRUE(outFile.is_open());
+        ASSERT_TRUE(req.getBody().writeTo(outFile));
+        outFile.close();
+    }
+
+    std::ifstream inFile(tempOutPath.c_str(), std::ios::in | std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+    std::ostringstream contentStream;
+    contentStream << inFile.rdbuf();
+    inFile.close();
+    std::remove(tempOutPath.c_str());
+
+    ASSERT_EQ(contentStream.str(), std::string(payload, payloadLen));
 }
 
 // =============================================================================
