@@ -49,6 +49,7 @@ TEST(HttpRequest_TestInitialState) {
     ASSERT_EQ(req.getContentLength(), 0u);
     ASSERT_EQ(req.getErrorCode(), 0);
     ASSERT_FALSE(req.isChunked());
+    ASSERT_EQ(req.getRemoteAddr(), "");
 }
 
 TEST(HttpRequest_TestCopyConstructor) {
@@ -57,6 +58,7 @@ TEST(HttpRequest_TestCopyConstructor) {
     original.setMethod("POST");
     original.setUri("/upload?user=42");
     original.setVersion("HTTP/1.1");
+    original.setRemoteAddr("192.168.1.42");
     original.addHeader("Content-Type", "text/plain");
     original.addHeader("Content-Length", "5");
     const char data[] = "hello";
@@ -69,6 +71,7 @@ TEST(HttpRequest_TestCopyConstructor) {
     ASSERT_EQ(copy.getUri(), "/upload");
     ASSERT_EQ(copy.getQueryString(), "user=42");
     ASSERT_EQ(copy.getVersion(), "HTTP/1.1");
+    ASSERT_EQ(copy.getRemoteAddr(), "192.168.1.42");
     ASSERT_EQ(copy.getContentLength(), 5u);
     ASSERT_EQ(copy.getErrorCode(), 0);
     ASSERT_EQ(copy.getBody().getSize(), 5u);
@@ -90,6 +93,7 @@ TEST(HttpRequest_TestAssignmentOperator) {
     original.setMethod("GET");
     original.setUri("/index.html");
     original.setVersion("HTTP/1.0");
+    original.setRemoteAddr("10.0.0.5");
     original.addHeader("Host", "localhost");
 
     HttpRequest assigned;
@@ -98,12 +102,14 @@ TEST(HttpRequest_TestAssignmentOperator) {
     ASSERT_EQ(assigned.getMethod(), "GET");
     ASSERT_EQ(assigned.getUri(), "/index.html");
     ASSERT_EQ(assigned.getVersion(), "HTTP/1.0");
+    ASSERT_EQ(assigned.getRemoteAddr(), "10.0.0.5");
     ASSERT_EQ(assigned.getHeaders().find("host")->second, "localhost");
 
     // Self-assignment safety check
     assigned = assigned;
     ASSERT_EQ(assigned.getMethod(), "GET");
     ASSERT_EQ(assigned.getUri(), "/index.html");
+    ASSERT_EQ(assigned.getRemoteAddr(), "10.0.0.5");
 }
 
 // =============================================================================
@@ -758,5 +764,8 @@ TEST(HttpRequest_TestDirectSettersAndGetters) {
 
     req.setContentLength(9999);
     ASSERT_EQ(req.getContentLength(), 9999u);
+
+    req.setRemoteAddr("127.0.0.1");
+    ASSERT_EQ(req.getRemoteAddr(), "127.0.0.1");
 }
 

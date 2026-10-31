@@ -539,6 +539,18 @@ TEST(CgiRequest_TestEnvVarsStandardGetMetaVariables) {
 
     ASSERT_TRUE(hasEnvKey(envVars, "SCRIPT_NAME"));
     ASSERT_EQ(getEnvValue(envVars, "SCRIPT_NAME"), "/cgi-bin/search.py");
+
+    ASSERT_TRUE(hasEnvKey(envVars, "SCRIPT_FILENAME"));
+    ASSERT_EQ(getEnvValue(envVars, "SCRIPT_FILENAME"), "/var/www/cgi/search.py");
+
+    ASSERT_TRUE(hasEnvKey(envVars, "DOCUMENT_ROOT"));
+    ASSERT_EQ(getEnvValue(envVars, "DOCUMENT_ROOT"), "/var/www/cgi");
+
+    ASSERT_TRUE(hasEnvKey(envVars, "REQUEST_URI"));
+    ASSERT_EQ(getEnvValue(envVars, "REQUEST_URI"), "/cgi-bin/search.py?q=webserv&lang=en");
+
+    ASSERT_TRUE(hasEnvKey(envVars, "REDIRECT_STATUS"));
+    ASSERT_EQ(getEnvValue(envVars, "REDIRECT_STATUS"), "200");
 }
 
 TEST(CgiRequest_TestEnvVarsEmptyQueryString) {
@@ -763,6 +775,107 @@ TEST(CgiRequest_TestEnvVarsArbitraryHttpHeadersMappedAndNormalized) {
 
     ASSERT_TRUE(hasEnvKey(envVars, "HTTP_X_CUSTOM_TOKEN"));
     ASSERT_EQ(getEnvValue(envVars, "HTTP_X_CUSTOM_TOKEN"), "secret-42");
+}
+
+TEST(CgiRequest_TestEnvVarsRemoteAddrAndRemoteHost) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+
+    // Default (unset) remoteAddr should produce empty REMOTE_ADDR and REMOTE_HOST
+    HttpRequest reqDefault = createDefaultGetCgiRequest("/cgi-bin/ip.py");
+    CgiRequest cgiDefault(srv, loc, reqDefault);
+    const std::vector<std::string>& defaultEnv = cgiDefault.getEnvVars();
+
+    ASSERT_TRUE(hasEnvKey(defaultEnv, "REMOTE_ADDR"));
+    ASSERT_EQ(getEnvValue(defaultEnv, "REMOTE_ADDR"), "");
+    ASSERT_TRUE(hasEnvKey(defaultEnv, "REMOTE_HOST"));
+    ASSERT_EQ(getEnvValue(defaultEnv, "REMOTE_HOST"), "");
+
+    // Explicitly set remoteAddr should populate both REMOTE_ADDR and REMOTE_HOST
+    HttpRequest reqWithIp = createDefaultGetCgiRequest("/cgi-bin/ip.py");
+    reqWithIp.setRemoteAddr("192.168.1.42");
+    CgiRequest cgiWithIp(srv, loc, reqWithIp);
+    const std::vector<std::string>& ipEnv = cgiWithIp.getEnvVars();
+
+    ASSERT_TRUE(hasEnvKey(ipEnv, "REMOTE_ADDR"));
+    ASSERT_EQ(getEnvValue(ipEnv, "REMOTE_ADDR"), "192.168.1.42");
+    ASSERT_TRUE(hasEnvKey(ipEnv, "REMOTE_HOST"));
+    ASSERT_EQ(getEnvValue(ipEnv, "REMOTE_HOST"), "192.168.1.42");
+}
+
+TEST(CgiRequest_TestEnvVarsRequestUriVariants) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+
+    // 1. Simple URI without query string
+    HttpRequest reqSimple = createDefaultGetCgiRequest("/cgi-bin/status.py");
+    CgiRequest cgiSimple(srv, loc, reqSimple);
+    ASSERT_TRUE(hasEnvKey(cgiSimple.getEnvVars(), "REQUEST_URI"));
+    ASSERT_EQ(getEnvValue(cgiSimple.getEnvVars(), "REQUEST_URI"), "/cgi-bin/status.py");
+
+    // 2. URI with query string
+    HttpRequest reqQuery = createDefaultGetCgiRequest("/cgi-bin/search.py?q=hello&page=2");
+    CgiRequest cgiQuery(srv, loc, reqQuery);
+    ASSERT_TRUE(hasEnvKey(cgiQuery.getEnvVars(), "REQUEST_URI"));
+    ASSERT_EQ(getEnvValue(cgiQuery.getEnvVars(), "REQUEST_URI"), "/cgi-bin/search.py?q=hello&page=2");
+
+    // 3. URI with extra PATH_INFO and query string
+    HttpRequest reqPathInfo = createDefaultGetCgiRequest("/cgi-bin/script.py/users/profile?tab=settings");
+    CgiRequest cgiPathInfo(srv, loc, reqPathInfo);
+    ASSERT_TRUE(hasEnvKey(cgiPathInfo.getEnvVars(), "REQUEST_URI"));
+    ASSERT_EQ(getEnvValue(cgiPathInfo.getEnvVars(), "REQUEST_URI"), "/cgi-bin/script.py/users/profile?tab=settings");
+}
+
+TEST(CgiRequest_TestEnvVarsDocumentRootAndScriptFilename) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation(); // path: /cgi-bin, root: /var/www/cgi
+
+    // Direct script in location root
+    HttpRequest reqDirect = createDefaultGetCgiRequest("/cgi-bin/index.php");
+    CgiRequest cgiDirect(srv, loc, reqDirect);
+    ASSERT_TRUE(hasEnvKey(cgiDirect.getEnvVars(), "DOCUMENT_ROOT"));
+    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "DOCUMENT_ROOT"), "/var/www/cgi");
+    ASSERT_TRUE(hasEnvKey(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"));
+    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"), "/var/www/cgi/index.php");
+    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"), cgiDirect.getScriptPath());
+
+    // Nested script with PATH_INFO (SCRIPT_FILENAME must exclude PATH_INFO)
+    HttpRequest reqNested = createDefaultGetCgiRequest("/cgi-bin/admin/report.py/2026/q1");
+    CgiRequest cgiNested(srv, loc, reqNested);
+    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "DOCUMENT_ROOT"), "/var/www/cgi");
+    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "SCRIPT_FILENAME"), "/var/www/cgi/admin/report.py");
+    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "SCRIPT_FILENAME"), cgiNested.getScriptPath());
+}
+
+TEST(CgiRequest_TestEnvVarsRedirectStatus) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/index.php");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_TRUE(hasEnvKey(envVars, "REDIRECT_STATUS"));
+    ASSERT_EQ(getEnvValue(envVars, "REDIRECT_STATUS"), "200");
+}
+
+TEST(CgiRequest_TestEnvVarsContentLengthFallbackFromBodySize) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req;
+    req.setMethod("POST");
+    req.setUri("/cgi-bin/chunked_upload.py");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "localhost:8080");
+    req.addHeader("Transfer-Encoding", "chunked");
+    const std::string bodyPayload = "chunked body payload without content-length header";
+    req.appendBody(bodyPayload.c_str(), bodyPayload.size());
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_TRUE(hasEnvKey(envVars, "CONTENT_LENGTH"));
+    ASSERT_EQ(getEnvValue(envVars, "CONTENT_LENGTH"), "50");
 }
 
 // =============================================================================
