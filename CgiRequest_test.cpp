@@ -170,7 +170,7 @@ std::string readAllFromFd(int fd) {
 } // namespace
 
 // =============================================================================
-// 1. Orthodox Canonical Form (Copy Constructor & Assignment Operator)
+// 1. Copy Construction & Reference Semantics
 // =============================================================================
 
 TEST(CgiRequest_TestCopyConstructorBasic) {
@@ -186,6 +186,8 @@ TEST(CgiRequest_TestCopyConstructorBasic) {
     ASSERT_EQ(copy.getExecutable(), original.getExecutable());
     ASSERT_EQ(copy.getScriptPath(), original.getScriptPath());
     ASSERT_EQ(copy.getWorkingDirectory(), original.getWorkingDirectory());
+    ASSERT_EQ(&copy.getBody(), &original.getBody());
+    ASSERT_EQ(&copy.getBody(), &req.getBody());
     ASSERT_EQ(copy.getBody().getFd(), original.getBody().getFd());
     ASSERT_EQ(copy.getBody().getSize(), original.getBody().getSize());
     ASSERT_EQ(copy.getEnvVars().size(), original.getEnvVars().size());
@@ -194,77 +196,31 @@ TEST(CgiRequest_TestCopyConstructorBasic) {
     }
 }
 
-TEST(CgiRequest_TestAssignmentOperatorBasic) {
-    ServerConfig srv1 = createDefaultServerConfig();
-    LocationConfig loc1 = createDefaultCgiLocation();
-    HttpRequest req1 = createDefaultGetCgiRequest("/cgi-bin/first.py");
-    req1.addHeader("User-Agent", "AgentOne");
+TEST(CgiRequest_TestCopyConstructorWithBodyReference) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req;
+    req.setMethod("POST");
+    req.setUri("/cgi-bin/second.php");
+    req.setVersion("HTTP/1.0");
+    req.addHeader("Host", "example.com");
+    req.addHeader("Content-Type", "text/plain");
+    req.addHeader("Content-Length", "4");
+    req.appendBody("test", 4);
 
-    ServerConfig srv2 = createDefaultServerConfig();
-    srv2.setPort(9090);
-    LocationConfig loc2 = createDefaultCgiLocation();
-    loc2.setRoot("/var/www/other_cgi");
-    HttpRequest req2;
-    req2.setMethod("POST");
-    req2.setUri("/cgi-bin/second.php");
-    req2.setVersion("HTTP/1.0");
-    req2.addHeader("Host", "example.com");
-    req2.addHeader("Content-Type", "text/plain");
-    req2.addHeader("Content-Length", "4");
-    req2.appendBody("test", 4);
+    CgiRequest original(srv, loc, req);
+    CgiRequest copy(original);
 
-    CgiRequest original(srv1, loc1, req1);
-    CgiRequest assigned(srv2, loc2, req2);
-
-    assigned = original;
-
-    ASSERT_EQ(assigned.getExecutable(), original.getExecutable());
-    ASSERT_EQ(assigned.getScriptPath(), original.getScriptPath());
-    ASSERT_EQ(assigned.getWorkingDirectory(), original.getWorkingDirectory());
-    ASSERT_EQ(assigned.getBody().getFd(), original.getBody().getFd());
-    ASSERT_EQ(assigned.getBody().getSize(), original.getBody().getSize());
-    ASSERT_EQ(assigned.getEnvVars().size(), original.getEnvVars().size());
+    ASSERT_EQ(copy.getExecutable(), "/usr/bin/php-cgi");
+    ASSERT_EQ(copy.getScriptPath(), original.getScriptPath());
+    ASSERT_EQ(copy.getWorkingDirectory(), original.getWorkingDirectory());
+    ASSERT_EQ(&copy.getBody(), &req.getBody());
+    ASSERT_EQ(copy.getBody().getFd(), req.getBody().getFd());
+    ASSERT_EQ(copy.getBody().getSize(), 4u);
+    ASSERT_EQ(copy.getEnvVars().size(), original.getEnvVars().size());
     for (size_t i = 0; i < original.getEnvVars().size(); ++i) {
-        ASSERT_EQ(assigned.getEnvVars()[i], original.getEnvVars()[i]);
+        ASSERT_EQ(copy.getEnvVars()[i], original.getEnvVars()[i]);
     }
-}
-
-TEST(CgiRequest_TestAssignmentOperatorSelfAssignment) {
-    ServerConfig srv = createDefaultServerConfig();
-    LocationConfig loc = createDefaultCgiLocation();
-    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/self.py");
-
-    CgiRequest cgi(srv, loc, req);
-    std::string expectedExec = cgi.getExecutable();
-    std::string expectedScript = cgi.getScriptPath();
-    std::string expectedWorkDir = cgi.getWorkingDirectory();
-    size_t expectedEnvCount = cgi.getEnvVars().size();
-
-    cgi = cgi;
-
-    ASSERT_EQ(cgi.getExecutable(), expectedExec);
-    ASSERT_EQ(cgi.getScriptPath(), expectedScript);
-    ASSERT_EQ(cgi.getWorkingDirectory(), expectedWorkDir);
-    ASSERT_EQ(cgi.getEnvVars().size(), expectedEnvCount);
-}
-
-TEST(CgiRequest_TestAssignmentOperatorChaining) {
-    ServerConfig srv = createDefaultServerConfig();
-    LocationConfig loc = createDefaultCgiLocation();
-    HttpRequest req1 = createDefaultGetCgiRequest("/cgi-bin/source.py");
-    HttpRequest req2 = createDefaultGetCgiRequest("/cgi-bin/other.php");
-    HttpRequest req3 = createDefaultGetCgiRequest("/cgi-bin/third.sh");
-
-    CgiRequest src(srv, loc, req1);
-    CgiRequest dest1(srv, loc, req2);
-    CgiRequest dest2(srv, loc, req3);
-
-    dest2 = dest1 = src;
-
-    ASSERT_EQ(dest1.getExecutable(), "/usr/bin/python3");
-    ASSERT_EQ(dest2.getExecutable(), "/usr/bin/python3");
-    ASSERT_EQ(dest1.getScriptPath(), src.getScriptPath());
-    ASSERT_EQ(dest2.getScriptPath(), src.getScriptPath());
 }
 
 // =============================================================================
@@ -876,6 +832,63 @@ TEST(CgiRequest_TestEnvVarsContentLengthFallbackFromBodySize) {
 
     ASSERT_TRUE(hasEnvKey(envVars, "CONTENT_LENGTH"));
     ASSERT_EQ(getEnvValue(envVars, "CONTENT_LENGTH"), "50");
+    ASSERT_FALSE(hasEnvKey(envVars, "HTTP_TRANSFER_ENCODING"));
+}
+
+TEST(CgiRequest_TestEnvVarsSkippedHttpHeadersNotExported) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req;
+    req.setMethod("POST");
+    req.setUri("/cgi-bin/security.py");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "localhost:8080");
+    req.addHeader("Transfer-Encoding", "chunked");
+    req.addHeader("Content-Type", "text/plain");
+    req.addHeader("Proxy", "http://malicious-proxy.local:8080");
+    req.addHeader("X-Allowed-Header", "visible");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_FALSE(hasEnvKey(envVars, "HTTP_CONTENT_LENGTH"));
+    ASSERT_FALSE(hasEnvKey(envVars, "HTTP_CONTENT_TYPE"));
+    ASSERT_FALSE(hasEnvKey(envVars, "HTTP_TRANSFER_ENCODING"));
+    ASSERT_FALSE(hasEnvKey(envVars, "HTTP_PROXY"));
+    ASSERT_TRUE(hasEnvKey(envVars, "HTTP_X_ALLOWED_HEADER"));
+    ASSERT_EQ(getEnvValue(envVars, "HTTP_X_ALLOWED_HEADER"), "visible");
+}
+
+TEST(CgiRequest_TestEnvVarsServerNameCaseInsensitiveHostMatch) {
+    ServerConfig srv;
+    srv.setHost("127.0.0.1");
+    srv.setPort(8080);
+    srv.addServerName("default.example.org");
+    srv.addServerName("Api.Example.Org");
+
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req;
+    req.setMethod("GET");
+    req.setUri("/cgi-bin/info.py");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "API.EXAMPLE.ORG:8080");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+
+    ASSERT_EQ(getEnvValue(envVars, "SERVER_NAME"), "Api.Example.Org");
+}
+
+TEST(CgiRequest_TestWorkingDirectoryRootSlash) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    loc.setRoot("/");
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/script.py");
+
+    CgiRequest cgi(srv, loc, req);
+
+    ASSERT_EQ(cgi.getScriptPath(), "/script.py");
+    ASSERT_EQ(cgi.getWorkingDirectory(), "/");
 }
 
 // =============================================================================

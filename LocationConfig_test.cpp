@@ -482,6 +482,28 @@ TEST(LocationConfig_TestAddCgiHandlerOverwriteExistingExtension) {
     ASSERT_EQ(loc.getCgiHandlers().find(".py")->second, "/usr/bin/python3");
 }
 
+TEST(LocationConfig_TestResolveScriptNameAndGetCgiHandler) {
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    loc.addCgiHandler(".php", "/usr/bin/php-cgi");
+
+    // Direct script match
+    ASSERT_EQ(loc.resolveScriptName("/cgi-bin/script.py"), "/cgi-bin/script.py");
+    ASSERT_EQ(loc.getCgiHandler("/cgi-bin/script.py"), "/usr/bin/python3");
+
+    // Script with PATH_INFO
+    ASSERT_EQ(loc.resolveScriptName("/cgi-bin/api.py/v1/users"), "/cgi-bin/api.py");
+    ASSERT_EQ(loc.getCgiHandler("/cgi-bin/api.py"), "/usr/bin/python3");
+
+    // Unregistered or missing extension
+    ASSERT_EQ(loc.resolveScriptName("/cgi-bin/script.rb"), "");
+    ASSERT_EQ(loc.getCgiHandler("/cgi-bin/script.rb"), "");
+    ASSERT_EQ(loc.resolveScriptName("/cgi-bin/no_ext"), "");
+    ASSERT_EQ(loc.getCgiHandler("/cgi-bin/no_ext"), "");
+    ASSERT_EQ(loc.getCgiHandler(""), "");
+}
+
 // =============================================================================
 // 10. Const-Correctness
 // =============================================================================
