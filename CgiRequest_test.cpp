@@ -957,7 +957,48 @@ TEST(CgiRequest_TestBodyFdBinaryBodyPreservesNullBytes) {
 }
 
 // =============================================================================
-// 6. Const-Correctness
+// 6. Argv and Envp Builders (buildArgv & buildEnvp)
+// =============================================================================
+
+TEST(CgiRequest_TestBuildArgv) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/sub/runner.py");
+
+    CgiRequest cgi(srv, loc, req);
+    std::vector<char*> argv = cgi.buildArgv();
+
+    ASSERT_EQ(argv.size(), 3u);
+    ASSERT_TRUE(argv[0] != NULL);
+    ASSERT_TRUE(argv[1] != NULL);
+    ASSERT_TRUE(argv[2] == NULL);
+    ASSERT_EQ(std::string(argv[0]), "/usr/bin/python3");
+    ASSERT_EQ(std::string(argv[1]), "/var/www/cgi/sub/runner.py");
+    ASSERT_EQ(argv[0], cgi.getExecutable().c_str());
+    ASSERT_EQ(argv[1], cgi.getScriptPath().c_str());
+}
+
+TEST(CgiRequest_TestBuildEnvp) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req = createDefaultGetCgiRequest("/cgi-bin/env_test.py?foo=bar");
+    req.addHeader("X-Custom", "val");
+
+    CgiRequest cgi(srv, loc, req);
+    const std::vector<std::string>& envVars = cgi.getEnvVars();
+    std::vector<char*> envp = cgi.buildEnvp();
+
+    ASSERT_EQ(envp.size(), envVars.size() + 1);
+    for (size_t i = 0; i < envVars.size(); ++i) {
+        ASSERT_TRUE(envp[i] != NULL);
+        ASSERT_EQ(std::string(envp[i]), envVars[i]);
+        ASSERT_EQ(envp[i], envVars[i].c_str());
+    }
+    ASSERT_TRUE(envp[envVars.size()] == NULL);
+}
+
+// =============================================================================
+// 7. Const-Correctness
 // =============================================================================
 
 TEST(CgiRequest_TestConstGetters) {
@@ -973,4 +1014,6 @@ TEST(CgiRequest_TestConstGetters) {
     ASSERT_FALSE(constCgi.getEnvVars().empty());
     ASSERT_TRUE(constCgi.getBody().empty());
     ASSERT_EQ(constCgi.getBody().getFd(), -1);
+    ASSERT_EQ(constCgi.buildArgv().size(), 3u);
+    ASSERT_EQ(constCgi.buildEnvp().size(), constCgi.getEnvVars().size() + 1);
 }

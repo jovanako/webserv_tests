@@ -196,3 +196,243 @@ TEST(ClientUnit_TestVirtualHostsAccessors) {
     ASSERT_EQ(client.getVirtualHosts()[0].getServerNames()[0], "site1.com");
     ASSERT_EQ(client.getVirtualHosts()[1].getServerNames()[0], "site2.org");
 }
+
+TEST(ClientUnit_TestClientIpAndLifecycleHelpers) {
+    Client client(15);
+    ASSERT_EQ(client.getClientIp(), "");
+
+    client.setClientIp("10.42.0.99");
+    ASSERT_EQ(client.getClientIp(), "10.42.0.99");
+
+    client.setupErrorResponse(404);
+    ASSERT_EQ(client.getClientState(), Client::WRITING_RESPONSE);
+
+    client.handleDone();
+    ASSERT_EQ(client.getClientIp(), "10.42.0.99");
+}
+
+// =============================================================================
+// 3. RequestParser Unit Tests
+// =============================================================================
+
+TEST(ClientUnit_TestRequestParserCanonicalFormAndBufferOps) {
+    RequestParser parser;
+    ASSERT_EQ(parser.getReadBuffer(), "");
+
+    const char raw[] = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    parser.appendData(raw, sizeof(raw) - 1);
+    ASSERT_EQ(parser.getReadBuffer(), std::string(raw, sizeof(raw) - 1));
+
+    size_t headerEnd = 0;
+    ASSERT_TRUE(parser.hasHeaderEnd(headerEnd));
+    ASSERT_EQ(headerEnd, 31u);
+
+    // Copy constructor & const getRequest()
+    RequestParser copyParser(parser);
+    const RequestParser& constRef = copyParser;
+    ASSERT_EQ(constRef.getReadBuffer(), parser.getReadBuffer());
+    ASSERT_EQ(constRef.getRequest().getRequestState(), HttpRequest::PARSE_REQUEST_LINE);
+
+    // Assignment operator & self-assignment
+    RequestParser assigned;
+    assigned = parser;
+    assigned = assigned;
+    ASSERT_EQ(assigned.getReadBuffer(), parser.getReadBuffer());
+
+    // eraseBuffer and reset
+    assigned.eraseBuffer(0, 4);
+    ASSERT_EQ(assigned.getReadBuffer(), "/ HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assigned.getRequest().setMethod("POST");
+    assigned.reset();
+    ASSERT_EQ(assigned.getRequest().getMethod(), "");
+}
+
+TEST(ClientUnit_TestRequestParserHeaderEdgeCases) {
+    // 1. Extra token on request line -> 400 Bad Request
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string req = "GET /index.html HTTP/1.1 EXTRA\r\nHost: localhost\r\n\r\n";
+        parser.appendData(req.c_str(), req.size());
+        ASSERT_FALSE(parser.parseHeaders(resp));
+        ASSERT_EQ(resp.getStatusCode(), 400);
+    }
+
+    // 2. Unsupported method -> 501 Not Implemented
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string req = "PUT /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        parser.appendData(req.c_str(), req.size());
+        ASSERT_FALSE(parser.parseHeaders(resp));
+        ASSERT_EQ(resp.getStatusCode(), 501);
+    }
+
+    // 3. Path traversal URI -> 403 Forbidden
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string req = "GET /../etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        parser.appendData(req.c_str(), req.size());
+        ASSERT_FALSE(parser.parseHeaders(resp));
+        ASSERT_EQ(resp.getStatusCode(), 403);
+    }
+
+    // 4. Header line without colon (ignored) and whitespace-only header value
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string req =
+            "GET / HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "MalformedLineWithoutColon\r\n"
+            "X-Blank:    \t   \r\n\r\n";
+        parser.appendData(req.c_str(), req.size());
+        ASSERT_TRUE(parser.parseHeaders(resp));
+        ASSERT_EQ(parser.getRequest().getHeaders().find("x-blank")->second, "");
+    }
+
+    // 5. Invalid header key or duplicate Host -> 400 Bad Request
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string req =
+            "GET / HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Host: duplicate.com\r\n\r\n";
+        parser.appendData(req.c_str(), req.size());
+        ASSERT_FALSE(parser.parseHeaders(resp));
+        ASSERT_EQ(resp.getStatusCode(), 400);
+    }
+}
+
+TEST(ClientUnit_TestRequestParserChunkedBody) {
+    // 1. Complete multi-chunk body with chunk extension
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string chunks =
+            "5;ext=val\r\n"
+            "Hello\r\n"
+            "7\r\n"
+            ", World\r\n"
+            "0\r\n\r\n";
+        parser.appendData(chunks.c_str(), chunks.size());
+        ASSERT_TRUE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(parser.getRequest().getContentLength(), 12u);
+        ASSERT_EQ(parser.getRequest().getBody().getSize(), 12u);
+        ASSERT_EQ(parser.getReadBuffer(), "");
+    }
+
+    // 2. Incremental / fragmented chunked body
+    {
+        RequestParser parser;
+        HttpResponse resp;
+
+        // Incomplete size line (no \r\n)
+        parser.appendData("4", 1);
+        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(resp.getStatusCode(), 0);
+
+        // Size line complete, but chunk data incomplete
+        parser.appendData("\r\nTe", 4);
+        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(resp.getStatusCode(), 0);
+
+        // Complete first chunk, followed by 0\r\n without final \r\n
+        parser.appendData("st\r\n0\r\n", 7);
+        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(resp.getStatusCode(), 0);
+
+        // Final \r\n arrives
+        parser.appendData("\r\n", 2);
+        ASSERT_TRUE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(parser.getRequest().getContentLength(), 4u);
+    }
+
+    // 3. Invalid hex chunk size -> 400 Bad Request
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string badChunk = "ZZZ\r\nhello\r\n0\r\n\r\n";
+        parser.appendData(badChunk.c_str(), badChunk.size());
+        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_EQ(resp.getStatusCode(), 400);
+    }
+}
+
+TEST(ClientUnit_TestRequestParserFixedLengthBody) {
+    ServerConfig server;
+    server.setClientMaxBodySize(10);
+
+    // 1. Partial body waits for more bytes
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        parser.getRequest().setContentLength(8);
+        parser.appendData("1234", 4);
+        ASSERT_FALSE(parser.processFixedLengthBody(server, resp));
+        ASSERT_EQ(resp.getStatusCode(), 0);
+
+        parser.appendData("5678", 4);
+        ASSERT_TRUE(parser.processFixedLengthBody(server, resp));
+        ASSERT_EQ(parser.getRequest().getBody().getSize(), 8u);
+        ASSERT_EQ(parser.getReadBuffer(), "");
+    }
+
+    // 2. Buffer exceeds client_max_body_size -> 413 Payload Too Large
+    {
+        RequestParser parser;
+        HttpResponse resp;
+        parser.getRequest().setContentLength(15);
+        parser.appendData("0123456789ABCDEF", 16);
+        ASSERT_FALSE(parser.processFixedLengthBody(server, resp));
+        ASSERT_EQ(resp.getStatusCode(), 413);
+    }
+}
+
+// =============================================================================
+// 4. RequestHandler & ResponseBuilder Unit Tests
+// =============================================================================
+
+TEST(ClientUnit_TestRequestHandlerMimeTypesAndCanonicalForm) {
+    RequestHandler h1;
+    RequestHandler h2(h1);
+    h1 = h2;
+
+    ASSERT_EQ(RequestHandler::getMimeType("/index.html"), "text/html");
+    ASSERT_EQ(RequestHandler::getMimeType("/page.htm"), "text/html");
+    ASSERT_EQ(RequestHandler::getMimeType("/style.css"), "text/css");
+    ASSERT_EQ(RequestHandler::getMimeType("/app.js"), "application/javascript");
+    ASSERT_EQ(RequestHandler::getMimeType("/data.json"), "application/json");
+    ASSERT_EQ(RequestHandler::getMimeType("/image.png"), "image/png");
+    ASSERT_EQ(RequestHandler::getMimeType("/photo.jpg"), "image/jpeg");
+    ASSERT_EQ(RequestHandler::getMimeType("/photo.jpeg"), "image/jpeg");
+    ASSERT_EQ(RequestHandler::getMimeType("/anim.gif"), "image/gif");
+    ASSERT_EQ(RequestHandler::getMimeType("/favicon.ico"), "image/x-icon");
+    ASSERT_EQ(RequestHandler::getMimeType("/readme.txt"), "text/plain");
+    ASSERT_EQ(RequestHandler::getMimeType("/manual.pdf"), "application/pdf");
+
+    // Case-insensitivity and fallback
+    ASSERT_EQ(RequestHandler::getMimeType("/PHOTO.JPG"), "image/jpeg");
+    ASSERT_EQ(RequestHandler::getMimeType("/DOC.PDF"), "application/pdf");
+    ASSERT_EQ(RequestHandler::getMimeType("/archive.tar.gz"), "application/octet-stream");
+    ASSERT_EQ(RequestHandler::getMimeType("/dir.with.dot/Makefile"), "application/octet-stream");
+    ASSERT_EQ(RequestHandler::getMimeType("/no_extension"), "application/octet-stream");
+}
+
+TEST(ClientUnit_TestResponseBuilderCanonicalFormAndKeepAliveFallback) {
+    ResponseBuilder rb1;
+    ResponseBuilder rb2(rb1);
+    rb1 = rb2;
+
+    // Request with unset HTTP version defaults to Connection: close
+    HttpRequest req;
+    HttpResponse resp;
+    resp.setStatusCode(200);
+    resp.setBody("ok");
+    rb1.buildResponse(resp, req);
+    ASSERT_EQ(resp.getHeader("Connection"), "close");
+    ASSERT_EQ(resp.getHeader("Content-Length"), "2");
+}
+

@@ -1018,3 +1018,108 @@ TEST(ClientIntegration_TestSocketPipelinedRequests) {
     std::string secondResponse = sp.readFromClient();
     ASSERT_TRUE(secondResponse.find("Second Response") != std::string::npos);
 }
+
+TEST(ClientIntegration_TestChunkedPostUploadAndStreamedChunks) {
+    TempDir tmp;
+    std::string uploadDir = tmp.path + "/uploads";
+    mkdir(uploadDir.c_str(), 0777);
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/upload");
+    loc.setUploadStore(uploadDir);
+    loc.addAllowedMethod("POST");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    // Send chunked headers and first chunk
+    sp.sendToClient(
+        "POST /upload/chunked.txt HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Transfer-Encoding: chunked\r\n\r\n"
+        "5;ext=1\r\nHello\r\n"
+    );
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::READING_BODY);
+
+    // Send second chunk and terminating 0 chunk
+    sp.sendToClient("6\r\n World\r\n0\r\n\r\n");
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::PROCESSING);
+
+    client.handleProcessing();
+    ASSERT_EQ(client.getClientState(), Client::WRITING_RESPONSE);
+    client.handleWrite();
+
+    std::string response = sp.readFromClient();
+    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
+    ASSERT_TRUE(tmp.fileExists("uploads/chunked.txt"));
+    ASSERT_EQ(tmp.readFile("uploads/chunked.txt"), "Hello World");
+}
+
+TEST(ClientIntegration_TestChunkedPostInvalidHexReturns400) {
+    TempDir tmp;
+    std::string uploadDir = tmp.path + "/uploads";
+    mkdir(uploadDir.c_str(), 0777);
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/upload");
+    loc.setUploadStore(uploadDir);
+    loc.addAllowedMethod("POST");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    std::string badChunkedReq =
+        "POST /upload/bad.txt HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Transfer-Encoding: chunked\r\n\r\n"
+        "NOT_HEX\r\ndata\r\n0\r\n\r\n";
+
+    std::string response = runTransaction(client, sp, badChunkedReq);
+    ASSERT_TRUE(response.find("400 Bad Request\r\n") != std::string::npos);
+    ASSERT_EQ(client.getClientState(), Client::DONE);
+}
+
+TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
+    TempDir tmp;
+    tmp.createFile("locked.txt", "secret");
+    std::string lockedFilePath = tmp.path + "/locked.txt";
+    chmod(lockedFilePath.c_str(), 0000);
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("GET");
+    loc.addAllowedMethod("POST");
+    loc.setUploadStore(tmp.path + "/nonexistent_subdir/uploads");
+    server.addLocation(loc);
+
+    // 1. Unreadable file -> 403 Forbidden (when not running as root)
+    if (geteuid() != 0) {
+        SocketPair sp1;
+        Client client1(sp1.clientFd());
+        client1.setServer(server);
+        std::string getResp = runTransaction(client1, sp1, "GET /locked.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        ASSERT_TRUE(getResp.find("403 Forbidden\r\n") != std::string::npos);
+    }
+    chmod(lockedFilePath.c_str(), 0644);
+
+    // 2. POST to non-existent upload_store directory -> 403 Forbidden
+    SocketPair sp2;
+    Client client2(sp2.clientFd());
+    client2.setServer(server);
+    std::string postResp = runTransaction(
+        client2, sp2,
+        "POST /item.txt HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\n\r\ndata"
+    );
+    ASSERT_TRUE(postResp.find("403 Forbidden\r\n") != std::string::npos);
+}
+

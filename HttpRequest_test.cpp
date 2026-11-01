@@ -348,6 +348,17 @@ TEST(HttpRequest_TestSetUriInvalidFormat) {
     req8.setUri("/test%ZZ");
     ASSERT_EQ(req8.getErrorCode(), 400);
     ASSERT_EQ(req8.getRequestState(), HttpRequest::PARSE_ERROR);
+
+    // Non-ASCII and DEL characters (>= 127)
+    HttpRequest req9;
+    req9.setUri("/test\x7Fpath");
+    ASSERT_EQ(req9.getErrorCode(), 400);
+    ASSERT_EQ(req9.getRequestState(), HttpRequest::PARSE_ERROR);
+
+    HttpRequest req10;
+    req10.setUri("/test\x80path");
+    ASSERT_EQ(req10.getErrorCode(), 400);
+    ASSERT_EQ(req10.getRequestState(), HttpRequest::PARSE_ERROR);
 }
 
 TEST(HttpRequest_TestSetUriPathTraversalSecurity) {
@@ -447,6 +458,12 @@ TEST(HttpRequest_TestAddHeaderInvalidKeys) {
     req5.addHeader("Header[Name]", "value");
     ASSERT_EQ(req5.getErrorCode(), 400);
     ASSERT_EQ(req5.getRequestState(), HttpRequest::PARSE_ERROR);
+
+    // Control / DEL / non-ASCII characters in header key
+    HttpRequest req6;
+    req6.addHeader("Header\x7FName", "value");
+    ASSERT_EQ(req6.getErrorCode(), 400);
+    ASSERT_EQ(req6.getRequestState(), HttpRequest::PARSE_ERROR);
 }
 
 TEST(HttpRequest_TestAddHeaderHostValid) {
@@ -532,6 +549,22 @@ TEST(HttpRequest_TestAddHeaderHostInvalid) {
     HttpRequest req13;
     req13.addHeader("Host", "123.456");
     ASSERT_EQ(req13.getErrorCode(), 400);
+
+    // Invalid character in domain label (underscore)
+    HttpRequest req14;
+    req14.addHeader("Host", "exam_ple.com");
+    ASSERT_EQ(req14.getErrorCode(), 400);
+
+    // Domain label longer than 63 characters
+    HttpRequest req15;
+    req15.addHeader("Host", std::string(64, 'a') + ".com");
+    ASSERT_EQ(req15.getErrorCode(), 400);
+
+    // Total domain longer than 253 characters
+    HttpRequest req16;
+    req16.addHeader("Host", std::string(63, 'a') + "." + std::string(63, 'b') + "."
+                          + std::string(63, 'c') + "." + std::string(63, 'd') + ".com");
+    ASSERT_EQ(req16.getErrorCode(), 400);
 }
 
 TEST(HttpRequest_TestAddHeaderHostDuplicate) {
@@ -580,6 +613,12 @@ TEST(HttpRequest_TestAddHeaderContentLengthInvalid) {
     ASSERT_EQ(req4.getErrorCode(), 0);
     req4.addHeader("Content-Length", "200");
     ASSERT_EQ(req4.getErrorCode(), 400);
+
+    // Numeric overflow exceeding size_t
+    HttpRequest req5;
+    req5.addHeader("Content-Length", "999999999999999999999999999999");
+    ASSERT_EQ(req5.getErrorCode(), 400);
+    ASSERT_EQ(req5.getRequestState(), HttpRequest::PARSE_ERROR);
 }
 
 TEST(HttpRequest_TestAddHeaderTransferEncodingValid) {
@@ -746,8 +785,36 @@ TEST(HttpRequest_TestBodyWriteToStream) {
     ASSERT_EQ(contentStream.str(), std::string(payload, payloadLen));
 }
 
+TEST(HttpRequest_TestRequestBodyCopyAndEmptyWriteTo) {
+    // Empty body writeTo should succeed without writing anything
+    RequestBody emptyBody;
+    std::ostringstream emptyPathStream;
+    emptyPathStream << "/tmp/webserv_test_empty_writeto_" << getpid();
+    std::string emptyOutPath = emptyPathStream.str();
+    {
+        std::ofstream outFile(emptyOutPath.c_str(), std::ios::out | std::ios::binary);
+        ASSERT_TRUE(outFile.is_open());
+        ASSERT_TRUE(emptyBody.writeTo(outFile));
+        outFile.close();
+    }
+    std::remove(emptyOutPath.c_str());
+
+    // Direct RequestBody copy constructor & self-assignment
+    RequestBody origBody;
+    ASSERT_TRUE(origBody.append("direct body", 11));
+    RequestBody copiedBody(origBody);
+    ASSERT_EQ(copiedBody.getSize(), 11u);
+    ASSERT_NE(copiedBody.getFd(), -1);
+    ASSERT_NE(copiedBody.getFd(), origBody.getFd());
+    ASSERT_EQ(readBodyContent(copiedBody), "direct body");
+
+    copiedBody = copiedBody;
+    ASSERT_EQ(copiedBody.getSize(), 11u);
+    ASSERT_EQ(readBodyContent(copiedBody), "direct body");
+}
+
 // =============================================================================
-// 7. Direct State and Attribute Setters/Getters
+// 7. Direct State, Attribute Setters/Getters & Path Resolution (makeFullPath)
 // =============================================================================
 
 TEST(HttpRequest_TestDirectSettersAndGetters) {
@@ -767,5 +834,45 @@ TEST(HttpRequest_TestDirectSettersAndGetters) {
 
     req.setRemoteAddr("127.0.0.1");
     ASSERT_EQ(req.getRemoteAddr(), "127.0.0.1");
+
+    // Non-const getBody() accessor
+    RequestBody& mutableBody = req.getBody();
+    ASSERT_TRUE(mutableBody.append("abc", 3));
+    ASSERT_EQ(req.getBody().getSize(), 3u);
 }
+
+TEST(HttpRequest_TestMakeFullPath) {
+    // 1. Root without trailing slash, URI with nested path
+    LocationConfig loc1;
+    loc1.setPath("/images");
+    loc1.setRoot("/var/www/assets");
+    HttpRequest req1;
+    req1.setUri("/images/logo.png");
+    ASSERT_EQ(req1.makeFullPath(loc1), "/var/www/assets/logo.png");
+
+    // 2. Root WITH trailing slash (must strip trailing slash before joining)
+    LocationConfig loc2;
+    loc2.setPath("/images");
+    loc2.setRoot("/var/www/assets/");
+    HttpRequest req2;
+    req2.setUri("/images/logo.png");
+    ASSERT_EQ(req2.makeFullPath(loc2), "/var/www/assets/logo.png");
+
+    // 3. Exact match between URI and location path (strippedUri is empty)
+    LocationConfig loc3;
+    loc3.setPath("/images");
+    loc3.setRoot("/var/www/assets/");
+    HttpRequest req3;
+    req3.setUri("/images");
+    ASSERT_EQ(req3.makeFullPath(loc3), "/var/www/assets/");
+
+    // 4. Location path "/" with trailing slash in location path (strippedUri lacks leading '/')
+    LocationConfig loc4;
+    loc4.setPath("/");
+    loc4.setRoot("/var/www/html");
+    HttpRequest req4;
+    req4.setUri("/index.html");
+    ASSERT_EQ(req4.makeFullPath(loc4), "/var/www/html/index.html");
+}
+
 

@@ -815,3 +815,33 @@ TEST(HttpResponse_TestEdgeCaseSpecialCharactersInBody) {
     ASSERT_EQ(resp.getBody().size(), bodyWithNull.length());
     ASSERT_EQ(resp.getBody(), std::vector<char>(bodyWithNull.begin(), bodyWithNull.end()));
 }
+
+TEST(HttpResponse_TestSetAndGetVersion) {
+    HttpResponse resp;
+
+    // Default version is empty string, which serializes as HTTP/1.0 in buildStatusLine
+    ASSERT_EQ(resp.getVersion(), "");
+    resp.setStatusCode(200);
+    ASSERT_EQ(vectorToString(resp.createResponse()), "HTTP/1.0 200 OK\r\n\r\n");
+
+    // Explicit HTTP/1.1 version
+    resp.setVersion("HTTP/1.1");
+    ASSERT_EQ(resp.getVersion(), "HTTP/1.1");
+    ASSERT_EQ(vectorToString(resp.createResponse()), "HTTP/1.1 200 OK\r\n\r\n");
+
+    // Explicit HTTP/1.0 version
+    resp.setVersion("HTTP/1.0");
+    ASSERT_EQ(resp.getVersion(), "HTTP/1.0");
+    ASSERT_EQ(vectorToString(resp.createResponse()), "HTTP/1.0 200 OK\r\n\r\n");
+}
+
+TEST(HttpResponse_TestGetHeader) {
+    HttpResponse resp;
+    resp.setHeader("Content-Type", "text/html");
+    resp.setHeader("Connection", "keep-alive");
+
+    ASSERT_EQ(resp.getHeader("Content-Type"), "text/html");
+    ASSERT_EQ(resp.getHeader("Connection"), "keep-alive");
+    ASSERT_EQ(resp.getHeader("Non-Existent-Header"), "");
+    ASSERT_EQ(resp.getHeader("content-type"), ""); // exact key match in HttpResponse
+}
