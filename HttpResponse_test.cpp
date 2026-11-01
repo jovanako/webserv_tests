@@ -200,6 +200,7 @@ TEST(HttpResponse_TestGetStatusMessageServerError5xx) {
     ASSERT_EQ(resp.getStatusMessage(501), "Not Implemented");
     ASSERT_EQ(resp.getStatusMessage(502), "Bad Gateway");
     ASSERT_EQ(resp.getStatusMessage(503), "Service Unavailable");
+    ASSERT_EQ(resp.getStatusMessage(504), "Gateway Timeout");
     ASSERT_EQ(resp.getStatusMessage(505), "HTTP Version Not Supported");
 }
 
@@ -217,7 +218,7 @@ TEST(HttpResponse_TestGetStatusMessageUnknownCodes) {
     ASSERT_EQ(resp.getStatusMessage(402), "Unknown Status");
     ASSERT_EQ(resp.getStatusMessage(418), "Unknown Status");
     ASSERT_EQ(resp.getStatusMessage(499), "Unknown Status");
-    ASSERT_EQ(resp.getStatusMessage(504), "Unknown Status");
+    ASSERT_EQ(resp.getStatusMessage(506), "Unknown Status");
     ASSERT_EQ(resp.getStatusMessage(599), "Unknown Status");
     ASSERT_EQ(resp.getStatusMessage(999), "Unknown Status");
     ASSERT_EQ(resp.getStatusMessage(-1), "Unknown Status");

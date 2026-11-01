@@ -12,6 +12,8 @@ WEBSERV_COMMON = ../webserv/RequestBody.cpp \
                  ../webserv/LocationConfig.cpp \
                  ../webserv/ConfigParser.cpp \
                  ../webserv/cgi/CgiRequest.cpp \
+                 ../webserv/cgi/CgiResponse.cpp \
+                 ../webserv/cgi/CgiExecutor.cpp \
                  ../webserv/Client/Client.cpp \
                  ../webserv/Client/RequestParser.cpp \
                  ../webserv/Client/RequestHandler.cpp \
@@ -23,8 +25,11 @@ LOCATION_CONFIG_SRCS = LocationConfig_test.cpp ../webserv/LocationConfig.cpp
 SERVER_CONFIG_SRCS = ServerConfig_test.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp
 CONFIG_PARSER_SRCS = ConfigParser_test.cpp ../webserv/ConfigParser.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp
 CGI_REQUEST_SRCS = CgiRequest_test.cpp ../webserv/cgi/CgiRequest.cpp ../webserv/ServerConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/LocationConfig.cpp
+CGI_RESPONSE_SRCS = CgiResponse_test.cpp ../webserv/cgi/CgiResponse.cpp ../webserv/HttpResponse.cpp
+CGI_EXECUTOR_SRCS = CgiExecutor_test.cpp ../webserv/cgi/CgiExecutor.cpp ../webserv/cgi/CgiRequest.cpp ../webserv/cgi/CgiResponse.cpp ../webserv/ServerConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp ../webserv/LocationConfig.cpp
+CGI_SRCS = CgiRequest_test.cpp CgiResponse_test.cpp CgiExecutor_test.cpp ../webserv/cgi/CgiExecutor.cpp ../webserv/cgi/CgiRequest.cpp ../webserv/cgi/CgiResponse.cpp ../webserv/ServerConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp ../webserv/LocationConfig.cpp
 
-CLIENT_UNIT_SRCS = Client_unit_test.cpp ../webserv/Client/Client.cpp ../webserv/Client/RequestParser.cpp ../webserv/Client/RequestHandler.cpp ../webserv/Client/ResponseBuilder.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp
+CLIENT_UNIT_SRCS = Client_unit_test.cpp ../webserv/Client/Client.cpp ../webserv/Client/RequestParser.cpp ../webserv/Client/RequestHandler.cpp ../webserv/Client/ResponseBuilder.cpp ../webserv/cgi/CgiRequest.cpp ../webserv/cgi/CgiResponse.cpp ../webserv/cgi/CgiExecutor.cpp ../webserv/ServerConfig.cpp ../webserv/LocationConfig.cpp ../webserv/RequestBody.cpp ../webserv/HttpRequest.cpp ../webserv/HttpResponse.cpp
 CLIENT_INTEG_SRCS = Client_integration_test.cpp $(WEBSERV_COMMON)
 CLIENT_SRCS = Client_unit_test.cpp Client_integration_test.cpp $(WEBSERV_COMMON)
 
@@ -35,6 +40,8 @@ SRCS = $(MAIN_SRC) \
        ServerConfig_test.cpp \
        ConfigParser_test.cpp \
        CgiRequest_test.cpp \
+       CgiResponse_test.cpp \
+       CgiExecutor_test.cpp \
        Client_unit_test.cpp \
        Client_integration_test.cpp \
        $(WEBSERV_COMMON)
@@ -63,6 +70,15 @@ test_config: $(MAIN_SRC) $(CONFIG_PARSER_SRCS) tiny_test.hpp
 
 test_cgi_request: $(MAIN_SRC) $(CGI_REQUEST_SRCS) tiny_test.hpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(MAIN_SRC) $(CGI_REQUEST_SRCS) -o test_cgi_request
+
+test_cgi_response: $(MAIN_SRC) $(CGI_RESPONSE_SRCS) tiny_test.hpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(MAIN_SRC) $(CGI_RESPONSE_SRCS) -o test_cgi_response
+
+test_cgi_executor: $(MAIN_SRC) $(CGI_EXECUTOR_SRCS) tiny_test.hpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(MAIN_SRC) $(CGI_EXECUTOR_SRCS) -o test_cgi_executor
+
+test_cgi: $(MAIN_SRC) $(CGI_SRCS) tiny_test.hpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(MAIN_SRC) $(CGI_SRCS) -o test_cgi
 
 test_client_unit: $(MAIN_SRC) $(CLIENT_UNIT_SRCS) tiny_test.hpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(MAIN_SRC) $(CLIENT_UNIT_SRCS) -o test_client_unit
@@ -93,6 +109,15 @@ run_config: test_config
 
 run_cgi_request: test_cgi_request
 	./test_cgi_request
+
+run_cgi_response: test_cgi_response
+	./test_cgi_response
+
+run_cgi_executor: test_cgi_executor
+	./test_cgi_executor
+
+run_cgi: test_cgi
+	./test_cgi
 
 run_client_unit: test_client_unit
 	./test_client_unit
@@ -126,11 +151,11 @@ coverage_html: coverage
 	gcovr --root ../webserv --object-directory . --html-details coverage_report/index.html
 
 clean:
-	rm -f $(NAME) test_request test_response test_location_config test_server_config test_config test_cgi_request test_client_unit test_client_integration test_client
+	rm -f $(NAME) test_request test_response test_location_config test_server_config test_config test_cgi_request test_cgi_response test_cgi_executor test_cgi test_client_unit test_client_integration test_client
 	rm -rf *.gcno *.gcda *.gcov coverage_report coverage.xml
 
 fclean: clean
 
 re: fclean all
 
-.PHONY: all run run_request run_response run_location_config run_server_config run_config run_cgi_request run_client_unit run_client_integration run_client coverage coverage_html clean fclean re
+.PHONY: all run run_request run_response run_location_config run_server_config run_config run_cgi_request run_cgi_response run_cgi_executor run_cgi run_client_unit run_client_integration run_client coverage coverage_html clean fclean re

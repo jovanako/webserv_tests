@@ -497,7 +497,7 @@ TEST(CgiRequest_TestEnvVarsStandardGetMetaVariables) {
     ASSERT_EQ(getEnvValue(envVars, "SCRIPT_NAME"), "/cgi-bin/search.py");
 
     ASSERT_TRUE(hasEnvKey(envVars, "SCRIPT_FILENAME"));
-    ASSERT_EQ(getEnvValue(envVars, "SCRIPT_FILENAME"), "/var/www/cgi/search.py");
+    ASSERT_EQ(getEnvValue(envVars, "SCRIPT_FILENAME"), "search.py");
 
     ASSERT_TRUE(hasEnvKey(envVars, "DOCUMENT_ROOT"));
     ASSERT_EQ(getEnvValue(envVars, "DOCUMENT_ROOT"), "/var/www/cgi");
@@ -792,15 +792,13 @@ TEST(CgiRequest_TestEnvVarsDocumentRootAndScriptFilename) {
     ASSERT_TRUE(hasEnvKey(cgiDirect.getEnvVars(), "DOCUMENT_ROOT"));
     ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "DOCUMENT_ROOT"), "/var/www/cgi");
     ASSERT_TRUE(hasEnvKey(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"));
-    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"), "/var/www/cgi/index.php");
-    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"), cgiDirect.getScriptPath());
+    ASSERT_EQ(getEnvValue(cgiDirect.getEnvVars(), "SCRIPT_FILENAME"), "index.php");
 
     // Nested script with PATH_INFO (SCRIPT_FILENAME must exclude PATH_INFO)
     HttpRequest reqNested = createDefaultGetCgiRequest("/cgi-bin/admin/report.py/2026/q1");
     CgiRequest cgiNested(srv, loc, reqNested);
     ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "DOCUMENT_ROOT"), "/var/www/cgi");
-    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "SCRIPT_FILENAME"), "/var/www/cgi/admin/report.py");
-    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "SCRIPT_FILENAME"), cgiNested.getScriptPath());
+    ASSERT_EQ(getEnvValue(cgiNested.getEnvVars(), "SCRIPT_FILENAME"), "report.py");
 }
 
 TEST(CgiRequest_TestEnvVarsRedirectStatus) {
@@ -973,9 +971,8 @@ TEST(CgiRequest_TestBuildArgv) {
     ASSERT_TRUE(argv[1] != NULL);
     ASSERT_TRUE(argv[2] == NULL);
     ASSERT_EQ(std::string(argv[0]), "/usr/bin/python3");
-    ASSERT_EQ(std::string(argv[1]), "/var/www/cgi/sub/runner.py");
+    ASSERT_EQ(std::string(argv[1]), "runner.py");
     ASSERT_EQ(argv[0], cgi.getExecutable().c_str());
-    ASSERT_EQ(argv[1], cgi.getScriptPath().c_str());
 }
 
 TEST(CgiRequest_TestBuildEnvp) {

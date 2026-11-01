@@ -200,6 +200,14 @@ TEST(ClientUnit_TestVirtualHostsAccessors) {
 TEST(ClientUnit_TestClientIpAndLifecycleHelpers) {
     Client client(15);
     ASSERT_EQ(client.getClientIp(), "");
+    ASSERT_EQ(client.getCgiPipeFd(), -1);
+    ASSERT_FALSE(client.hasCgiTimedOut());
+
+    // Calling CGI wait/timeout/cleanup when not in CGI_PIPE_WAIT is a safe no-op
+    client.handleCgiPipeWait();
+    client.handleCgiTimeout();
+    client.cleanupCgi();
+    ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
 
     client.setClientIp("10.42.0.99");
     ASSERT_EQ(client.getClientIp(), "10.42.0.99");

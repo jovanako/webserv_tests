@@ -7,6 +7,9 @@
 `make run_server_config` - Runs ServerConfig tests
 `make run_location_config` - Runs LocationConfig tests
 `make run_cgi_request` - Runs CgiRequest tests
+`make run_cgi_response` - Runs CgiResponse tests
+`make run_cgi_executor` - Runs CgiExecutor tests
+`make run_cgi`       - Runs all CGI tests
 `make run`           - Runs all tests across all suites  
 `make coverage`      - Runs all tests and prints code coverage for `../webserv`  
 `make coverage_html` - Generates detailed HTML coverage report in `coverage_report/index.html` (requires `gcovr`)  

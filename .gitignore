@@ -8,6 +8,9 @@ test_client_unit
 test_client_integration
 test_client
 test_cgi_request
+test_cgi_response
+test_cgi_executor
+test_cgi
 *.gcno
 *.gcda
 *.gcov

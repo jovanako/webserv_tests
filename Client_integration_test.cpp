@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <poll.h>
 
 namespace {
 
@@ -130,12 +131,34 @@ struct SocketPair {
     }
 };
 
-// Helper to run a standard read -> processing -> write cycle on a Client
+// Helper to run a standard read -> processing -> (optional CGI poll wait) -> write cycle on a Client
+void driveClientCgiWithPoll(Client& client, int timeoutMs = 5000) {
+    while (client.getClientState() == Client::CGI_PIPE_WAIT) {
+        int pipeFd = client.getCgiPipeFd();
+        if (pipeFd < 0) {
+            break;
+        }
+        struct pollfd pfd;
+        pfd.fd = pipeFd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        if (poll(&pfd, 1, timeoutMs) <= 0) {
+            break;
+        }
+        if (pfd.revents & (POLLIN | POLLHUP | POLLERR)) {
+            client.handleCgiPipeWait();
+        }
+    }
+}
+
 std::string runTransaction(Client& client, SocketPair& sp, const std::string& requestData) {
     sp.sendToClient(requestData);
     client.handleRead();
     if (client.getClientState() == Client::PROCESSING) {
         client.handleProcessing();
+    }
+    if (client.getClientState() == Client::CGI_PIPE_WAIT) {
+        driveClientCgiWithPoll(client);
     }
     if (client.getClientState() == Client::WRITING_RESPONSE) {
         client.handleWrite();
@@ -1122,4 +1145,263 @@ TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
     );
     ASSERT_TRUE(postResp.find("403 Forbidden\r\n") != std::string::npos);
 }
+
+// =============================================================================
+// 11. CGI End-to-End Protocol Integration (Subject IV.3 & RFC 3875)
+// =============================================================================
+
+TEST(ClientIntegration_TestCgiGetWithQueryStringAndHeaders) {
+    TempDir tmp;
+    tmp.createFile("echo_env.py",
+        "import os, sys\n"
+        "qs = os.environ.get('QUERY_STRING', '')\n"
+        "method = os.environ.get('REQUEST_METHOD', '')\n"
+        "ip = os.environ.get('REMOTE_ADDR', '')\n"
+        "custom = os.environ.get('HTTP_X_CLIENT_TAG', '')\n"
+        "body = f'{method}|{qs}|{ip}|{custom}'\n"
+        "sys.stdout.write('Content-Type: text/plain\\r\\n\\r\\n' + body)\n"
+    );
+
+    ServerConfig server;
+    server.setHost("127.0.0.1");
+    server.setPort(8080);
+    server.addServerName("localhost");
+
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("GET");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+    client.setClientIp("192.168.10.25");
+
+    std::string req =
+        "GET /cgi-bin/echo_env.py?key=42&mode=test HTTP/1.1\r\n"
+        "Host: localhost:8080\r\n"
+        "X-Client-Tag: integration-cgi\r\n\r\n";
+
+    std::string response = runTransaction(client, sp, req);
+
+    std::string expectedBody = "GET|key=42&mode=test|192.168.10.25|integration-cgi";
+    std::ostringstream lenStream;
+    lenStream << expectedBody.size();
+
+    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
+    ASSERT_TRUE(response.find("Content-Type: text/plain\r\n") != std::string::npos);
+    // Subject IV.3: CGI did not return Content-Length; server marks end by EOF and sets Content-Length
+    ASSERT_TRUE(response.find("Content-Length: " + lenStream.str() + "\r\n") != std::string::npos);
+    ASSERT_TRUE(response.find(expectedBody) != std::string::npos);
+    ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
+}
+
+TEST(ClientIntegration_TestCgiPostFixedContentLengthBody) {
+    TempDir tmp;
+    tmp.createFile("post_handler.py",
+        "import os, sys\n"
+        "body = sys.stdin.read()\n"
+        "cl = os.environ.get('CONTENT_LENGTH', '')\n"
+        "ct = os.environ.get('CONTENT_TYPE', '')\n"
+        "sys.stdout.write('Status: 201 Created\\r\\n')\n"
+        "sys.stdout.write('Content-Type: text/plain\\r\\n\\r\\n')\n"
+        "sys.stdout.write(f'CL={cl};CT={ct};DATA={body}')\n"
+    );
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("POST");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    std::string req =
+        "POST /cgi-bin/post_handler.py HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\n"
+        "Content-Length: 19\r\n\r\n"
+        "user=jovana&team=42";
+
+    std::string response = runTransaction(client, sp, req);
+
+    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
+    ASSERT_TRUE(response.find("CL=19;CT=application/x-www-form-urlencoded;DATA=user=jovana&team=42") != std::string::npos);
+}
+
+TEST(ClientIntegration_TestCgiPostChunkedRequestUnchunkedToStdinEOF) {
+    // Subject IV.3: "Just remember that, for chunked requests, your server needs to un-chunk
+    // them, the CGI will expect EOF as the end of the body."
+    TempDir tmp;
+    tmp.createFile("chunk_cgi.py",
+        "import os, sys\n"
+        "data = sys.stdin.read()\n"
+        "cl = os.environ.get('CONTENT_LENGTH', '')\n"
+        "te = os.environ.get('HTTP_TRANSFER_ENCODING', 'NONE')\n"
+        "sys.stdout.write('Content-Type: text/plain\\r\\n\\r\\n')\n"
+        "sys.stdout.write(f'CL={cl};TE={te};BODY={data}')\n"
+    );
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("POST");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    // Send chunked request in two socket fragments
+    sp.sendToClient(
+        "POST /cgi-bin/chunk_cgi.py HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Transfer-Encoding: chunked\r\n\r\n"
+        "7\r\nUnchunk\r\n"
+    );
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::READING_BODY);
+
+    sp.sendToClient("9\r\ned Stream\r\n0\r\n\r\n");
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::PROCESSING);
+
+    client.handleProcessing();
+    ASSERT_EQ(client.getClientState(), Client::CGI_PIPE_WAIT);
+    driveClientCgiWithPoll(client);
+    ASSERT_EQ(client.getClientState(), Client::WRITING_RESPONSE);
+    client.handleWrite();
+
+    std::string response = sp.readFromClient();
+    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
+    ASSERT_TRUE(response.find("CL=16;TE=NONE;BODY=Unchunked Stream") != std::string::npos);
+}
+
+TEST(ClientIntegration_TestCgiRelativePathAccessAndRedirect) {
+    // Subject IV.3: "The CGI should be run in the correct directory for relative path file access."
+    TempDir tmp;
+    tmp.createSubDir("scripts");
+    tmp.createFile("scripts/local_asset.txt", "RelativeFileContentOK");
+    tmp.createFile("scripts/read_local.py",
+        "import sys\n"
+        "with open('local_asset.txt', 'r') as f:\n"
+        "    content = f.read()\n"
+        "sys.stdout.write('Content-Type: text/plain\\r\\n\\r\\n' + content)\n"
+    );
+    tmp.createFile("scripts/redirect.py",
+        "import sys\n"
+        "sys.stdout.write('Location: /new-home\\r\\n\\r\\n')\n"
+    );
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("GET");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    // 1. Relative file access from subdirectory
+    std::string resp1 = runTransaction(
+        client, sp,
+        "GET /cgi-bin/scripts/read_local.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+    );
+    ASSERT_TRUE(resp1.find("200 OK\r\n") != std::string::npos);
+    ASSERT_TRUE(resp1.find("RelativeFileContentOK") != std::string::npos);
+
+    // 2. CGI Location header redirect on the same keep-alive connection (RFC 3875 -> 302 Found)
+    std::string resp2 = runTransaction(
+        client, sp,
+        "GET /cgi-bin/scripts/redirect.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+    );
+    ASSERT_TRUE(resp2.find("302 Found\r\n") != std::string::npos);
+    ASSERT_TRUE(resp2.find("Location: /new-home\r\n") != std::string::npos);
+}
+
+TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
+    TempDir tmp;
+    tmp.createFile("bad_exit.py", "import sys\nsys.exit(42)\n");
+    tmp.createFile("bad_output.py", "import sys\nsys.stdout.write('NoHeaderSeparatorAtAll')\n");
+    tmp.createFile("hang.py", "import time\ntime.sleep(30)\n");
+
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/cgi-bin");
+    loc.setRoot(tmp.path);
+    loc.addAllowedMethod("GET");
+    loc.addCgiHandler(".py", "/usr/bin/python3");
+    server.addLocation(loc);
+
+    // 1. Missing CGI script -> 404 Not Found
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
+        std::string resp = runTransaction(
+            client, sp,
+            "GET /cgi-bin/missing.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        );
+        ASSERT_TRUE(resp.find("404 Not Found\r\n") != std::string::npos);
+    }
+
+    // 2. CGI script exits with non-zero status -> 502 Bad Gateway
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
+        std::string resp = runTransaction(
+            client, sp,
+            "GET /cgi-bin/bad_exit.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        );
+        ASSERT_TRUE(resp.find("502 Bad Gateway\r\n") != std::string::npos);
+    }
+
+    // 3. CGI script produces malformed output without header boundary -> 502 Bad Gateway
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
+        std::string resp = runTransaction(
+            client, sp,
+            "GET /cgi-bin/bad_output.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        );
+        ASSERT_TRUE(resp.find("502 Bad Gateway\r\n") != std::string::npos);
+    }
+
+    // 4. Hanging CGI script -> handleCgiTimeout() produces 504 Gateway Timeout
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
+
+        sp.sendToClient("GET /cgi-bin/hang.py HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        client.handleRead();
+        ASSERT_EQ(client.getClientState(), Client::PROCESSING);
+        client.handleProcessing();
+        ASSERT_EQ(client.getClientState(), Client::CGI_PIPE_WAIT);
+        ASSERT_TRUE(client.getCgiPipeFd() >= 0);
+        ASSERT_FALSE(client.hasCgiTimedOut());
+
+        client.handleCgiTimeout();
+        ASSERT_EQ(client.getClientState(), Client::WRITING_RESPONSE);
+        ASSERT_EQ(client.getCgiPipeFd(), -1);
+        client.handleWrite();
+
+        std::string resp = sp.readFromClient();
+        ASSERT_TRUE(resp.find("504 Gateway Timeout\r\n") != std::string::npos);
+    }
+}
+
 
