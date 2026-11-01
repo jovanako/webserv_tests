@@ -665,6 +665,8 @@ TEST(CgiExecutor_TestTimeoutDetectionAndHandleTimeoutReturns504) {
     pid_t childPid = executor.getPid();
     ASSERT_TRUE(childPid > 0);
 
+    // With a large threshold (60s), timeout is not yet reached
+    ASSERT_FALSE(executor.hasTimedOut(60));
     // With a 0-second threshold, timeout is immediately detected
     ASSERT_TRUE(executor.hasTimedOut(0));
 
@@ -675,6 +677,81 @@ TEST(CgiExecutor_TestTimeoutDetectionAndHandleTimeoutReturns504) {
     ASSERT_EQ(executor.getPid(), -1);
 
     // Verify hanging child was killed and reaped (no zombie left behind)
+    int status = 0;
+    ASSERT_EQ(waitpid(childPid, &status, WNOHANG), -1);
+    ASSERT_EQ(errno, ECHILD);
+}
+
+TEST(CgiExecutor_TestChildClosesStdoutBeforeProcessExits) {
+    // Edge case: CGI script closes stdout (triggering EOF on the pipe) and performs
+    // brief cleanup before exiting. reapChild() must wait for exit status and not leave a zombie.
+    TempDir tmp;
+    tmp.createFile("early_close.py",
+        "import os, sys, time\n"
+        "sys.stdout.write('Content-Type: text/plain\\r\\n\\r\\nEarlyCloseOK')\n"
+        "sys.stdout.flush()\n"
+        "os.close(1)\n"
+        "time.sleep(0.05)\n"
+        "sys.exit(0)\n"
+    );
+
+    ServerConfig srv = makeServerConfig();
+    LocationConfig loc = makeCgiLocation(tmp.path);
+
+    HttpRequest req;
+    req.setMethod("GET");
+    req.setUri("/cgi-bin/early_close.py");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "localhost");
+
+    CgiRequest cgiReq(srv, loc, req);
+    CgiExecutor executor;
+
+    ASSERT_TRUE(executor.start(cgiReq));
+    pid_t childPid = executor.getPid();
+    ASSERT_TRUE(driveExecutorWithPoll(executor));
+    ASSERT_EQ(executor.getState(), CgiExecutor::CGI_COMPLETE);
+
+    CgiResponse cgiResp;
+    ASSERT_TRUE(cgiResp.parse(executor.getOutputBuffer()));
+    ASSERT_EQ(vecToStr(cgiResp.getBody()), "EarlyCloseOK");
+
+    int status = 0;
+    ASSERT_EQ(waitpid(childPid, &status, WNOHANG), -1);
+    ASSERT_EQ(errno, ECHILD);
+}
+
+TEST(CgiExecutor_TestReadOutputErrorKillsChildAndSets500) {
+    TempDir tmp;
+    tmp.createFile("silent_wait.py",
+        "import time\n"
+        "time.sleep(30)\n"
+    );
+
+    ServerConfig srv = makeServerConfig();
+    LocationConfig loc = makeCgiLocation(tmp.path);
+
+    HttpRequest req;
+    req.setMethod("GET");
+    req.setUri("/cgi-bin/silent_wait.py");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "localhost");
+
+    CgiRequest cgiReq(srv, loc, req);
+    CgiExecutor executor;
+
+    ASSERT_TRUE(executor.start(cgiReq));
+    pid_t childPid = executor.getPid();
+    ASSERT_TRUE(childPid > 0);
+
+    // Calling readOutput() when no data is available on the non-blocking pipe causes read() < 0,
+    // which must clean up the pipe, terminate/reap the child, and transition to CGI_ERROR (500).
+    ASSERT_FALSE(executor.readOutput());
+    ASSERT_EQ(executor.getState(), CgiExecutor::CGI_ERROR);
+    ASSERT_EQ(executor.getErrorCode(), 500);
+    ASSERT_EQ(executor.getPipeFd(), -1);
+    ASSERT_EQ(executor.getPid(), -1);
+
     int status = 0;
     ASSERT_EQ(waitpid(childPid, &status, WNOHANG), -1);
     ASSERT_EQ(errno, ECHILD);

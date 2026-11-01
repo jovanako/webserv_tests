@@ -243,9 +243,11 @@ TEST(CgiResponse_TestLocationHeaderWithExplicitStatusPreservesStatus) {
 
 TEST(CgiResponse_TestHeaderWhitespaceTrimmingAndDefaultContentType) {
     CgiResponse cgiResp;
-    // CGI script outputs custom header with extra whitespace, no Content-Type, and non-empty body
+    // CGI script outputs custom header with extra whitespace, an intermediate whitespace-only line,
+    // no Content-Type, and non-empty body
     std::string raw =
         "X-Custom-Header :   \t  custom value with spaces   \t \r\n"
+        "   \t   \r\n"
         "Set-Cookie: session=abc123; Path=/; HttpOnly\r\n"
         "\r\n"
         "<p>Fallback content type test</p>";

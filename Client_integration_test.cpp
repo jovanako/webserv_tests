@@ -1404,4 +1404,34 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
     }
 }
 
+TEST(ClientIntegration_TestClientDisconnectDuringBodyRead) {
+    TempDir tmp;
+    ServerConfig server;
+    LocationConfig loc;
+    loc.setPath("/upload");
+    loc.setUploadStore(tmp.path);
+    loc.addAllowedMethod("POST");
+    server.addLocation(loc);
+
+    SocketPair sp;
+    Client client(sp.clientFd());
+    client.setServer(server);
+
+    // Send headers announcing 50-byte body + only 5 bytes, then close peer socket
+    sp.sendToClient(
+        "POST /upload/partial.txt HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Length: 50\r\n\r\n"
+        "12345"
+    );
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::READING_BODY);
+
+    // Peer disconnects before sending the rest of the body
+    shutdown(sp.peerFd(), SHUT_WR);
+    client.handleRead();
+    ASSERT_EQ(client.getClientState(), Client::DONE);
+}
+
+
 
