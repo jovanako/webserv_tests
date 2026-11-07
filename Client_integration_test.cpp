@@ -614,8 +614,10 @@ TEST(ClientIntegration_TestDeleteExistingFile) {
     ASSERT_FALSE(tmp.fileExists("remove_me.txt"));
 }
 
-TEST(ClientIntegration_TestDeleteNonExistentFile403) {
+TEST(ClientIntegration_TestDeleteNonExistentFile404AndUnremovable403) {
     TempDir tmp;
+    tmp.createSubDir("non_empty_dir");
+    tmp.createFile("non_empty_dir/inside.txt", "keep");
 
     ServerConfig server;
     LocationConfig loc;
@@ -624,13 +626,25 @@ TEST(ClientIntegration_TestDeleteNonExistentFile403) {
     loc.addAllowedMethod("DELETE");
     server.addLocation(loc);
 
-    SocketPair sp;
-    Client client(sp.clientFd());
-    client.setServer(server);
+    // 1. Deleting a non-existent file returns 404 Not Found
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
 
-    std::string response = runTransaction(client, sp, "DELETE /already_gone.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        std::string response = runTransaction(client, sp, "DELETE /already_gone.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
+    }
 
-    ASSERT_TRUE(response.find("403 Forbidden\r\n") != std::string::npos);
+    // 2. Deleting an existing but unremovable path (non-empty directory) returns 403 Forbidden
+    {
+        SocketPair sp;
+        Client client(sp.clientFd());
+        client.setServer(server);
+
+        std::string response = runTransaction(client, sp, "DELETE /non_empty_dir HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        ASSERT_TRUE(response.find("403 Forbidden\r\n") != std::string::npos);
+    }
 }
 
 // =============================================================================

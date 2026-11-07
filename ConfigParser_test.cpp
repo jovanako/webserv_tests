@@ -595,7 +595,8 @@ TEST(ConfigParser_TestErrorPageInvalidThrows) {
 // =============================================================================
 
 TEST(ConfigParser_TestLocationDefaultValues) {
-    // When no 'index' directive is provided, LocationConfig gets "index.html" by default
+    // When no 'index' or 'allow_methods' directive is provided, LocationConfig gets
+    // "index.html" and {"GET", "POST", "DELETE"} by default
     std::vector<ServerConfig> servers = parseConfigString(
         "server {\n"
         "    location / {\n"
@@ -611,7 +612,10 @@ TEST(ConfigParser_TestLocationDefaultValues) {
     ASSERT_EQ(loc.getRoot(), "");
     ASSERT_EQ(loc.getIndex().size(), 1u);
     ASSERT_EQ(loc.getIndex()[0], "index.html");
-    ASSERT_TRUE(loc.getAllowedMethods().empty());
+    ASSERT_EQ(loc.getAllowedMethods().size(), 3u);
+    ASSERT_EQ(loc.getAllowedMethods()[0], "GET");
+    ASSERT_EQ(loc.getAllowedMethods()[1], "POST");
+    ASSERT_EQ(loc.getAllowedMethods()[2], "DELETE");
     ASSERT_FALSE(loc.getAutoindex());
     ASSERT_TRUE(loc.getCgiHandlers().empty());
     ASSERT_EQ(loc.getUploadStore(), "");

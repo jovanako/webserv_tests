@@ -202,6 +202,11 @@ TEST(ClientUnit_TestClientIpAndLifecycleHelpers) {
     ASSERT_EQ(client.getClientIp(), "");
     ASSERT_EQ(client.getCgiPipeFd(), -1);
     ASSERT_FALSE(client.hasCgiTimedOut());
+    ASSERT_FALSE(client.clientHasTimedOut());
+
+    client.setClientState(Client::CGI_PIPE_WAIT);
+    ASSERT_FALSE(client.clientHasTimedOut());
+    client.setClientState(Client::READING_HEADER);
 
     // Calling CGI wait/timeout/cleanup when not in CGI_PIPE_WAIT is a safe no-op
     client.handleCgiPipeWait();
@@ -315,6 +320,9 @@ TEST(ClientUnit_TestRequestParserHeaderEdgeCases) {
 }
 
 TEST(ClientUnit_TestRequestParserChunkedBody) {
+    ServerConfig server;
+    server.setClientMaxBodySize(1024);
+
     // 1. Complete multi-chunk body with chunk extension
     {
         RequestParser parser;
@@ -326,7 +334,7 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
             ", World\r\n"
             "0\r\n\r\n";
         parser.appendData(chunks.c_str(), chunks.size());
-        ASSERT_TRUE(parser.parseChunkedBody(resp));
+        ASSERT_TRUE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(parser.getRequest().getContentLength(), 12u);
         ASSERT_EQ(parser.getRequest().getBody().getSize(), 12u);
         ASSERT_EQ(parser.getReadBuffer(), "");
@@ -339,22 +347,22 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
 
         // Incomplete size line (no \r\n)
         parser.appendData("4", 1);
-        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Size line complete, but chunk data incomplete
         parser.appendData("\r\nTe", 4);
-        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Complete first chunk, followed by 0\r\n without final \r\n
         parser.appendData("st\r\n0\r\n", 7);
-        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Final \r\n arrives
         parser.appendData("\r\n", 2);
-        ASSERT_TRUE(parser.parseChunkedBody(resp));
+        ASSERT_TRUE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(parser.getRequest().getContentLength(), 4u);
     }
 
@@ -364,8 +372,20 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
         HttpResponse resp;
         const std::string badChunk = "ZZZ\r\nhello\r\n0\r\n\r\n";
         parser.appendData(badChunk.c_str(), badChunk.size());
-        ASSERT_FALSE(parser.parseChunkedBody(resp));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
         ASSERT_EQ(resp.getStatusCode(), 400);
+    }
+
+    // 4. Chunked body exceeding client_max_body_size -> 413 Payload Too Large
+    {
+        ServerConfig smallServer;
+        smallServer.setClientMaxBodySize(5);
+        RequestParser parser;
+        HttpResponse resp;
+        const std::string bigChunk = "6\r\n123456\r\n0\r\n\r\n";
+        parser.appendData(bigChunk.c_str(), bigChunk.size());
+        ASSERT_FALSE(parser.parseChunkedBody(resp, smallServer));
+        ASSERT_EQ(resp.getStatusCode(), 413);
     }
 }
 

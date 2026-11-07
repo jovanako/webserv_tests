@@ -141,7 +141,7 @@ TEST(CgiExecutor_TestInitialStateAndCanonicalForm) {
     ASSERT_EQ(exec1.getPipeFd(), -1);
     ASSERT_EQ(exec1.getPid(), -1);
     ASSERT_EQ(exec1.getErrorCode(), 0);
-    ASSERT_FALSE(exec1.hasTimedOut());
+    ASSERT_FALSE(exec1.cgiHasTimedOut());
     ASSERT_TRUE(exec1.getOutputBuffer().empty());
     ASSERT_FALSE(exec1.readOutput());
 
@@ -665,10 +665,8 @@ TEST(CgiExecutor_TestTimeoutDetectionAndHandleTimeoutReturns504) {
     pid_t childPid = executor.getPid();
     ASSERT_TRUE(childPid > 0);
 
-    // With a large threshold (60s), timeout is not yet reached
-    ASSERT_FALSE(executor.hasTimedOut(60));
-    // With a 0-second threshold, timeout is immediately detected
-    ASSERT_TRUE(executor.hasTimedOut(0));
+    // Immediately after start, DEFAULT_TIMEOUT_SEC has not elapsed yet
+    ASSERT_FALSE(executor.cgiHasTimedOut());
 
     executor.handleTimeout();
     ASSERT_EQ(executor.getState(), CgiExecutor::CGI_ERROR);
