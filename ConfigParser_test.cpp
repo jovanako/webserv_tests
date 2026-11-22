@@ -245,7 +245,7 @@ TEST(ConfigParser_TestEmptyServerBlockDefaults) {
     ASSERT_EQ(servers.size(), 1u);
     ASSERT_EQ(servers[0].getHost(), "0.0.0.0");
     ASSERT_EQ(servers[0].getPort(), 8080);
-    ASSERT_EQ(servers[0].getPortString(), "8080");
+    ASSERT_EQ(servers[0].createPortString(), "8080");
     ASSERT_EQ(servers[0].getClientMaxBodySize(), 1048576u);
     ASSERT_TRUE(servers[0].getServerNames().empty());
     ASSERT_TRUE(servers[0].getErrorPages().empty());
@@ -330,7 +330,7 @@ TEST(ConfigParser_TestListenPortOnly) {
     ASSERT_EQ(servers.size(), 1u);
     ASSERT_EQ(servers[0].getHost(), "0.0.0.0");
     ASSERT_EQ(servers[0].getPort(), 4242);
-    ASSERT_EQ(servers[0].getPortString(), "4242");
+    ASSERT_EQ(servers[0].createPortString(), "4242");
 }
 
 TEST(ConfigParser_TestListenHostAndPort) {
@@ -346,11 +346,11 @@ TEST(ConfigParser_TestListenHostAndPort) {
     ASSERT_EQ(servers.size(), 2u);
     ASSERT_EQ(servers[0].getHost(), "192.168.1.50");
     ASSERT_EQ(servers[0].getPort(), 8000);
-    ASSERT_EQ(servers[0].getPortString(), "8000");
+    ASSERT_EQ(servers[0].createPortString(), "8000");
 
     ASSERT_EQ(servers[1].getHost(), "localhost");
     ASSERT_EQ(servers[1].getPort(), 3000);
-    ASSERT_EQ(servers[1].getPortString(), "3000");
+    ASSERT_EQ(servers[1].createPortString(), "3000");
 }
 
 TEST(ConfigParser_TestListenHostOnlyDefaultPort80) {
@@ -364,7 +364,7 @@ TEST(ConfigParser_TestListenHostOnlyDefaultPort80) {
     ASSERT_EQ(servers.size(), 1u);
     ASSERT_EQ(servers[0].getHost(), "127.0.0.1");
     ASSERT_EQ(servers[0].getPort(), 80);
-    ASSERT_EQ(servers[0].getPortString(), "80");
+    ASSERT_EQ(servers[0].createPortString(), "80");
 }
 
 TEST(ConfigParser_TestListenPortBoundaries) {
@@ -897,7 +897,7 @@ TEST(ConfigParser_TestFullRealisticMultiServerConfig) {
     const ServerConfig& s1 = servers[0];
     ASSERT_EQ(s1.getHost(), "127.0.0.1");
     ASSERT_EQ(s1.getPort(), 8080);
-    ASSERT_EQ(s1.getPortString(), "8080");
+    ASSERT_EQ(s1.createPortString(), "8080");
     ASSERT_EQ(s1.getClientMaxBodySize(), 10u * 1048576u);
     ASSERT_EQ(s1.getServerNames().size(), 2u);
     ASSERT_EQ(s1.getServerNames()[0], "webserv.42.fr");

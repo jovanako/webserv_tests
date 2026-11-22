@@ -70,10 +70,10 @@ TEST(HttpResponse_TestCopyConstructorIndependence) {
     ASSERT_EQ(vectorToString(copy.getBody()), "original content");
 
     std::string copyStr = vectorToString(copy.createResponse());
-    ASSERT_TRUE(copyStr.find("HTTP/1.0 200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(copyStr.find("Server: webserv\r\n") != std::string::npos);
+    ASSERT_CONTAINS(copyStr, "HTTP/1.0 200 OK\r\n");
+    ASSERT_CONTAINS(copyStr, "Server: webserv\r\n");
     ASSERT_TRUE(copyStr.find("X-Extra") == std::string::npos);
-    ASSERT_TRUE(copyStr.find("original content") != std::string::npos);
+    ASSERT_CONTAINS(copyStr, "original content");
 
     // Mutate copy - original must remain unaffected
     copy.setStatusCode(500);
@@ -118,7 +118,7 @@ TEST(HttpResponse_TestAssignmentOperatorIndependence) {
     ASSERT_EQ(vectorToString(assigned.getBody()), "{\"key\":\"value\"}");
 
     std::string assignedStr = vectorToString(assigned.createResponse());
-    ASSERT_TRUE(assignedStr.find("HTTP/1.0 200 OK\r\n") != std::string::npos);
+    ASSERT_CONTAINS(assignedStr, "HTTP/1.0 200 OK\r\n");
     ASSERT_TRUE(assignedStr.find("Retry-After") == std::string::npos);
 }
 
@@ -135,9 +135,9 @@ TEST(HttpResponse_TestAssignmentOperatorSelfAssignment) {
     ASSERT_EQ(vectorToString(resp.getBody()), "test body");
 
     std::string respStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(respStr.find("HTTP/1.0 200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(respStr.find("Content-Type: text/html\r\n") != std::string::npos);
-    ASSERT_TRUE(respStr.find("test body") != std::string::npos);
+    ASSERT_CONTAINS(respStr, "HTTP/1.0 200 OK\r\n");
+    ASSERT_CONTAINS(respStr, "Content-Type: text/html\r\n");
+    ASSERT_CONTAINS(respStr, "test body");
 }
 
 TEST(HttpResponse_TestAssignmentOperatorChaining) {
@@ -245,7 +245,7 @@ TEST(HttpResponse_TestSetStatusCodeValid) {
     ASSERT_EQ(resp.getStatusCode(), 200);
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 200 OK\r\n") == 0);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 200 OK\r\n");
 }
 
 TEST(HttpResponse_TestSetStatusCodeSuccessiveUpdates) {
@@ -253,19 +253,19 @@ TEST(HttpResponse_TestSetStatusCodeSuccessiveUpdates) {
 
     resp.setStatusCode(200);
     ASSERT_EQ(resp.getStatusCode(), 200);
-    ASSERT_TRUE(vectorToString(resp.createResponse()).find("HTTP/1.0 200 OK\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp.createResponse()), "HTTP/1.0 200 OK\r\n");
 
     resp.setStatusCode(404);
     ASSERT_EQ(resp.getStatusCode(), 404);
-    ASSERT_TRUE(vectorToString(resp.createResponse()).find("HTTP/1.0 404 Not Found\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp.createResponse()), "HTTP/1.0 404 Not Found\r\n");
 
     resp.setStatusCode(500);
     ASSERT_EQ(resp.getStatusCode(), 500);
-    ASSERT_TRUE(vectorToString(resp.createResponse()).find("HTTP/1.0 500 Internal Server Error\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp.createResponse()), "HTTP/1.0 500 Internal Server Error\r\n");
 
     resp.setStatusCode(201);
     ASSERT_EQ(resp.getStatusCode(), 201);
-    ASSERT_TRUE(vectorToString(resp.createResponse()).find("HTTP/1.0 201 Created\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp.createResponse()), "HTTP/1.0 201 Created\r\n");
 }
 
 TEST(HttpResponse_TestSetStatusCodeUnknownCode) {
@@ -275,7 +275,7 @@ TEST(HttpResponse_TestSetStatusCodeUnknownCode) {
     ASSERT_EQ(resp.getStatusCode(), 418);
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 418 Unknown Status\r\n") == 0);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 418 Unknown Status\r\n");
 }
 
 // =============================================================================
@@ -288,7 +288,7 @@ TEST(HttpResponse_TestSetHeaderSingle) {
     resp.setHeader("Content-Type", "text/html; charset=UTF-8");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("Content-Type: text/html; charset=UTF-8\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "Content-Type: text/html; charset=UTF-8\r\n");
 }
 
 TEST(HttpResponse_TestSetHeaderMultipleDistinct) {
@@ -300,10 +300,10 @@ TEST(HttpResponse_TestSetHeaderMultipleDistinct) {
     resp.setHeader("Connection", "keep-alive");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("Server: webserv/1.0\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find("Content-Type: application/json\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find("Content-Length: 42\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find("Connection: keep-alive\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "Server: webserv/1.0\r\n");
+    ASSERT_CONTAINS(responseStr, "Content-Type: application/json\r\n");
+    ASSERT_CONTAINS(responseStr, "Content-Length: 42\r\n");
+    ASSERT_CONTAINS(responseStr, "Connection: keep-alive\r\n");
 }
 
 TEST(HttpResponse_TestSetHeaderOverwrite) {
@@ -313,7 +313,7 @@ TEST(HttpResponse_TestSetHeaderOverwrite) {
     resp.setHeader("Content-Length", "250");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("Content-Length: 250\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "Content-Length: 250\r\n");
     ASSERT_TRUE(responseStr.find("Content-Length: 100\r\n") == std::string::npos);
 }
 
@@ -351,7 +351,7 @@ TEST(HttpResponse_TestSetHeaderEmptyValue) {
     resp.setHeader("X-Empty-Header", "");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("X-Empty-Header: \r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "X-Empty-Header: \r\n");
 }
 
 TEST(HttpResponse_TestSetHeaderSpecialCharacters) {
@@ -361,8 +361,8 @@ TEST(HttpResponse_TestSetHeaderSpecialCharacters) {
     resp.setHeader("Set-Cookie", "sessionId=abc123xyz; Path=/; HttpOnly");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("Location: http://localhost:8080/path/to/page?user=42&view=full\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find("Set-Cookie: sessionId=abc123xyz; Path=/; HttpOnly\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "Location: http://localhost:8080/path/to/page?user=42&view=full\r\n");
+    ASSERT_CONTAINS(responseStr, "Set-Cookie: sessionId=abc123xyz; Path=/; HttpOnly\r\n");
 }
 
 // =============================================================================
@@ -548,8 +548,8 @@ TEST(HttpResponse_TestCreateResponseBinaryBodyPreservation) {
 
     // Verify header portion
     std::string headerPart(raw.begin(), raw.begin() + headerEndPos);
-    ASSERT_TRUE(headerPart.find("HTTP/1.0 200 OK\r\n") == 0);
-    ASSERT_TRUE(headerPart.find("Content-Type: application/octet-stream\r\n") != std::string::npos);
+    ASSERT_CONTAINS(headerPart, "HTTP/1.0 200 OK\r\n");
+    ASSERT_CONTAINS(headerPart, "Content-Type: application/octet-stream\r\n");
 
     // Verify binary body portion
     std::vector<char> bodyPart(raw.begin() + headerEndPos, raw.end());
@@ -652,9 +652,9 @@ TEST(HttpResponse_TestScenario400BadRequest) {
     resp.setHeader("Connection", "close");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 400 Bad Request\r\n") == 0);
-    ASSERT_TRUE(responseStr.find("Connection: close\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find(body) != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 400 Bad Request\r\n");
+    ASSERT_CONTAINS(responseStr, "Connection: close\r\n");
+    ASSERT_CONTAINS(responseStr, body);
 }
 
 TEST(HttpResponse_TestScenario403Forbidden) {
@@ -665,8 +665,8 @@ TEST(HttpResponse_TestScenario403Forbidden) {
     resp.setHeader("Content-Type", "text/html");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 403 Forbidden\r\n") == 0);
-    ASSERT_TRUE(responseStr.find(body) != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 403 Forbidden\r\n");
+    ASSERT_CONTAINS(responseStr, body);
 }
 
 TEST(HttpResponse_TestScenario404NotFound) {
@@ -677,8 +677,8 @@ TEST(HttpResponse_TestScenario404NotFound) {
     resp.setHeader("Content-Type", "text/html");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 404 Not Found\r\n") == 0);
-    ASSERT_TRUE(responseStr.find(body) != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 404 Not Found\r\n");
+    ASSERT_CONTAINS(responseStr, body);
 }
 
 TEST(HttpResponse_TestScenario405MethodNotAllowed) {
@@ -688,9 +688,9 @@ TEST(HttpResponse_TestScenario405MethodNotAllowed) {
     resp.setBody("Method Not Allowed");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 405 Method Not Allowed\r\n") == 0);
-    ASSERT_TRUE(responseStr.find("Allow: GET, POST\r\n") != std::string::npos);
-    ASSERT_TRUE(responseStr.find("Method Not Allowed") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 405 Method Not Allowed\r\n");
+    ASSERT_CONTAINS(responseStr, "Allow: GET, POST\r\n");
+    ASSERT_CONTAINS(responseStr, "Method Not Allowed");
 }
 
 TEST(HttpResponse_TestScenario413PayloadTooLarge) {
@@ -700,8 +700,8 @@ TEST(HttpResponse_TestScenario413PayloadTooLarge) {
     resp.setBody("Payload Too Large");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 413 Payload Too Large\r\n") == 0);
-    ASSERT_TRUE(responseStr.find("Connection: close\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 413 Payload Too Large\r\n");
+    ASSERT_CONTAINS(responseStr, "Connection: close\r\n");
 }
 
 TEST(HttpResponse_TestScenario500InternalServerError) {
@@ -711,7 +711,7 @@ TEST(HttpResponse_TestScenario500InternalServerError) {
     resp.setBody("Internal Server Error");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 500 Internal Server Error\r\n") == 0);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 500 Internal Server Error\r\n");
 }
 
 TEST(HttpResponse_TestScenario505HttpVersionNotSupported) {
@@ -721,7 +721,7 @@ TEST(HttpResponse_TestScenario505HttpVersionNotSupported) {
     resp.setBody("HTTP Version Not Supported");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("HTTP/1.0 505 HTTP Version Not Supported\r\n") == 0);
+    ASSERT_CONTAINS(responseStr, "HTTP/1.0 505 HTTP Version Not Supported\r\n");
 }
 
 // =============================================================================
@@ -776,13 +776,13 @@ TEST(HttpResponse_TestEdgeCaseZeroAndNegativeStatusCode) {
     resp1.setStatusCode(0);
     ASSERT_EQ(resp1.getStatusCode(), 0);
     ASSERT_EQ(resp1.getStatusMessage(0), "Unknown Status");
-    ASSERT_TRUE(vectorToString(resp1.createResponse()).find("HTTP/1.0 0 Unknown Status\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp1.createResponse()), "HTTP/1.0 0 Unknown Status\r\n");
 
     HttpResponse resp2;
     resp2.setStatusCode(-1);
     ASSERT_EQ(resp2.getStatusCode(), -1);
     ASSERT_EQ(resp2.getStatusMessage(-1), "Unknown Status");
-    ASSERT_TRUE(vectorToString(resp2.createResponse()).find("HTTP/1.0 -1 Unknown Status\r\n") == 0);
+    ASSERT_CONTAINS(vectorToString(resp2.createResponse()), "HTTP/1.0 -1 Unknown Status\r\n");
 }
 
 TEST(HttpResponse_TestEdgeCaseMultipleHeaderOverwritesAndMutations) {
@@ -798,10 +798,10 @@ TEST(HttpResponse_TestEdgeCaseMultipleHeaderOverwritesAndMutations) {
     resp.setBody("body2");
 
     std::string responseStr = vectorToString(resp.createResponse());
-    ASSERT_TRUE(responseStr.find("Key: Value3\r\n") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "Key: Value3\r\n");
     ASSERT_TRUE(responseStr.find("Key: Value1") == std::string::npos);
     ASSERT_TRUE(responseStr.find("Key: Value2") == std::string::npos);
-    ASSERT_TRUE(responseStr.find("body2") != std::string::npos);
+    ASSERT_CONTAINS(responseStr, "body2");
     ASSERT_TRUE(responseStr.find("body1") == std::string::npos);
 }
 

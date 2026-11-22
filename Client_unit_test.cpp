@@ -334,7 +334,7 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
             ", World\r\n"
             "0\r\n\r\n";
         parser.appendData(chunks.c_str(), chunks.size());
-        ASSERT_TRUE(parser.parseChunkedBody(resp, server));
+        ASSERT_TRUE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(parser.getRequest().getContentLength(), 12u);
         ASSERT_EQ(parser.getRequest().getBody().getSize(), 12u);
         ASSERT_EQ(parser.getReadBuffer(), "");
@@ -347,22 +347,22 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
 
         // Incomplete size line (no \r\n)
         parser.appendData("4", 1);
-        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Size line complete, but chunk data incomplete
         parser.appendData("\r\nTe", 4);
-        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Complete first chunk, followed by 0\r\n without final \r\n
         parser.appendData("st\r\n0\r\n", 7);
-        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         // Final \r\n arrives
         parser.appendData("\r\n", 2);
-        ASSERT_TRUE(parser.parseChunkedBody(resp, server));
+        ASSERT_TRUE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(parser.getRequest().getContentLength(), 4u);
     }
 
@@ -372,7 +372,7 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
         HttpResponse resp;
         const std::string badChunk = "ZZZ\r\nhello\r\n0\r\n\r\n";
         parser.appendData(badChunk.c_str(), badChunk.size());
-        ASSERT_FALSE(parser.parseChunkedBody(resp, server));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, server.getClientMaxBodySize()));
         ASSERT_EQ(resp.getStatusCode(), 400);
     }
 
@@ -384,7 +384,7 @@ TEST(ClientUnit_TestRequestParserChunkedBody) {
         HttpResponse resp;
         const std::string bigChunk = "6\r\n123456\r\n0\r\n\r\n";
         parser.appendData(bigChunk.c_str(), bigChunk.size());
-        ASSERT_FALSE(parser.parseChunkedBody(resp, smallServer));
+        ASSERT_FALSE(parser.parseChunkedBody(resp, smallServer.getClientMaxBodySize()));
         ASSERT_EQ(resp.getStatusCode(), 413);
     }
 }
@@ -399,11 +399,11 @@ TEST(ClientUnit_TestRequestParserFixedLengthBody) {
         HttpResponse resp;
         parser.getRequest().setContentLength(8);
         parser.appendData("1234", 4);
-        ASSERT_FALSE(parser.processFixedLengthBody(server, resp));
+        ASSERT_FALSE(parser.processFixedLengthBody(server.getClientMaxBodySize(), resp));
         ASSERT_EQ(resp.getStatusCode(), 0);
 
         parser.appendData("5678", 4);
-        ASSERT_TRUE(parser.processFixedLengthBody(server, resp));
+        ASSERT_TRUE(parser.processFixedLengthBody(server.getClientMaxBodySize(), resp));
         ASSERT_EQ(parser.getRequest().getBody().getSize(), 8u);
         ASSERT_EQ(parser.getReadBuffer(), "");
     }
@@ -414,7 +414,7 @@ TEST(ClientUnit_TestRequestParserFixedLengthBody) {
         HttpResponse resp;
         parser.getRequest().setContentLength(15);
         parser.appendData("0123456789ABCDEF", 16);
-        ASSERT_FALSE(parser.processFixedLengthBody(server, resp));
+        ASSERT_FALSE(parser.processFixedLengthBody(server.getClientMaxBodySize(), resp));
         ASSERT_EQ(resp.getStatusCode(), 413);
     }
 }

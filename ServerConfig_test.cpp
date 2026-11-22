@@ -15,7 +15,7 @@ TEST(ServerConfig_TestInitialState) {
 
     ASSERT_EQ(config.getHost(), "0.0.0.0");
     ASSERT_EQ(config.getPort(), 8080);
-    ASSERT_EQ(config.getPortString(), "8080");
+    ASSERT_EQ(config.createPortString(), "8080");
     ASSERT_EQ(config.getClientMaxBodySize(), 1048576u);
     ASSERT_TRUE(config.getServerNames().empty());
     ASSERT_EQ(config.getServerNames().size(), 0u);
@@ -45,7 +45,7 @@ TEST(ServerConfig_TestCopyConstructorBasic) {
 
     ASSERT_EQ(copy.getHost(), "127.0.0.1");
     ASSERT_EQ(copy.getPort(), 9090);
-    ASSERT_EQ(copy.getPortString(), "9090");
+    ASSERT_EQ(copy.createPortString(), "9090");
     ASSERT_EQ(copy.getClientMaxBodySize(), 2097152u);
 
     ASSERT_EQ(copy.getServerNames().size(), 2u);
@@ -91,7 +91,7 @@ TEST(ServerConfig_TestCopyConstructorIndependence) {
 
     ASSERT_EQ(copy.getHost(), "127.0.0.1");
     ASSERT_EQ(copy.getPort(), 8000);
-    ASSERT_EQ(copy.getPortString(), "8000");
+    ASSERT_EQ(copy.createPortString(), "8000");
     ASSERT_EQ(copy.getClientMaxBodySize(), 4096u);
     ASSERT_EQ(copy.getServerNames().size(), 1u);
     ASSERT_EQ(copy.getServerNames()[0], "original.local");
@@ -133,7 +133,7 @@ TEST(ServerConfig_TestAssignmentOperatorBasic) {
 
     ASSERT_EQ(assigned.getHost(), "10.10.0.1");
     ASSERT_EQ(assigned.getPort(), 4242);
-    ASSERT_EQ(assigned.getPortString(), "4242");
+    ASSERT_EQ(assigned.createPortString(), "4242");
     ASSERT_EQ(assigned.getClientMaxBodySize(), 65536u);
     ASSERT_EQ(assigned.getServerNames().size(), 1u);
     ASSERT_EQ(assigned.getServerNames()[0], "test.42.fr");
@@ -251,7 +251,7 @@ TEST(ServerConfig_TestSetHostEmptyString) {
 }
 
 // =============================================================================
-// 3. Port Management (setPort, getPort & getPortString)
+// 3. Port Management (setPort, getPort & createPortString)
 // =============================================================================
 
 TEST(ServerConfig_TestSetAndGetPortStandard) {
@@ -259,19 +259,19 @@ TEST(ServerConfig_TestSetAndGetPortStandard) {
 
     config.setPort(80);
     ASSERT_EQ(config.getPort(), 80);
-    ASSERT_EQ(config.getPortString(), "80");
+    ASSERT_EQ(config.createPortString(), "80");
 
     config.setPort(443);
     ASSERT_EQ(config.getPort(), 443);
-    ASSERT_EQ(config.getPortString(), "443");
+    ASSERT_EQ(config.createPortString(), "443");
 
     config.setPort(3000);
     ASSERT_EQ(config.getPort(), 3000);
-    ASSERT_EQ(config.getPortString(), "3000");
+    ASSERT_EQ(config.createPortString(), "3000");
 
     config.setPort(8080);
     ASSERT_EQ(config.getPort(), 8080);
-    ASSERT_EQ(config.getPortString(), "8080");
+    ASSERT_EQ(config.createPortString(), "8080");
 }
 
 TEST(ServerConfig_TestSetAndGetPortBoundaries) {
@@ -280,21 +280,21 @@ TEST(ServerConfig_TestSetAndGetPortBoundaries) {
     // Minimum valid TCP port
     config.setPort(1);
     ASSERT_EQ(config.getPort(), 1);
-    ASSERT_EQ(config.getPortString(), "1");
+    ASSERT_EQ(config.createPortString(), "1");
 
     // Maximum valid TCP port
     config.setPort(65535);
     ASSERT_EQ(config.getPort(), 65535);
-    ASSERT_EQ(config.getPortString(), "65535");
+    ASSERT_EQ(config.createPortString(), "65535");
 
     // Zero and negative values (ServerConfig stores raw int without validation)
     config.setPort(0);
     ASSERT_EQ(config.getPort(), 0);
-    ASSERT_EQ(config.getPortString(), "0");
+    ASSERT_EQ(config.createPortString(), "0");
 
     config.setPort(-1);
     ASSERT_EQ(config.getPort(), -1);
-    ASSERT_EQ(config.getPortString(), "-1");
+    ASSERT_EQ(config.createPortString(), "-1");
 }
 
 // =============================================================================
@@ -541,7 +541,7 @@ TEST(ServerConfig_TestConstGetters) {
 
     ASSERT_EQ(constConfig.getHost(), "127.0.0.1");
     ASSERT_EQ(constConfig.getPort(), 8085);
-    ASSERT_EQ(constConfig.getPortString(), "8085");
+    ASSERT_EQ(constConfig.createPortString(), "8085");
     ASSERT_EQ(constConfig.getClientMaxBodySize(), 4194304u);
     ASSERT_EQ(constConfig.getServerNames().size(), 1u);
     ASSERT_EQ(constConfig.getServerNames()[0], "const.example.com");

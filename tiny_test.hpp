@@ -141,6 +141,18 @@ struct AutoRegister {
         } \
     } while (false)
 
+#define ASSERT_CONTAINS(actual, expected) \
+    do { \
+        const std::string tt_actual_ = (actual); \
+        const std::string tt_expected_ = (expected); \
+        if (tt_actual_.find(tt_expected_) == std::string::npos) { \
+            throw TinyTest::AssertionFailure(__FILE__, __LINE__, \
+                std::string("Contains check failed: ") + #actual " contains " #expected + \
+                "\n    Expected to contain: \"" + tt_expected_ + "\"" + \
+                "\n    Actual:              \"" + tt_actual_ + "\""); \
+        } \
+    } while (false)
+
 #define ASSERT_THROWS(expression, ExceptionType) \
     do { \
         bool caught_ = false; \

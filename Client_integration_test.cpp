@@ -189,10 +189,10 @@ TEST(ClientIntegration_TestGetExistingFile) {
 
     std::string response = runTransaction(client, sp, "GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Content-Type: text/html\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Content-Length: 28\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("<h1>Hello from webserv!</h1>") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Content-Type: text/html\r\n");
+    ASSERT_CONTAINS(response, "Content-Length: 28\r\n");
+    ASSERT_CONTAINS(response, "<h1>Hello from webserv!</h1>");
 }
 
 TEST(ClientIntegration_TestGetMimeTypes) {
@@ -215,23 +215,23 @@ TEST(ClientIntegration_TestGetMimeTypes) {
 
     // CSS
     std::string resCss = runTransaction(client, sp, "GET /app.css HTTP/1.1\r\nHost: localhost\r\n\r\n");
-    ASSERT_TRUE(resCss.find("200 OK") != std::string::npos);
-    ASSERT_TRUE(resCss.find("Content-Type: text/css\r\n") != std::string::npos);
+    ASSERT_CONTAINS(resCss, "200 OK");
+    ASSERT_CONTAINS(resCss, "Content-Type: text/css\r\n");
 
     // JS
     std::string resJs = runTransaction(client, sp, "GET /app.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
-    ASSERT_TRUE(resJs.find("200 OK") != std::string::npos);
-    ASSERT_TRUE(resJs.find("Content-Type: application/javascript\r\n") != std::string::npos);
+    ASSERT_CONTAINS(resJs, "200 OK");
+    ASSERT_CONTAINS(resJs, "Content-Type: application/javascript\r\n");
 
     // JSON
     std::string resJson = runTransaction(client, sp, "GET /data.json HTTP/1.1\r\nHost: localhost\r\n\r\n");
-    ASSERT_TRUE(resJson.find("200 OK") != std::string::npos);
-    ASSERT_TRUE(resJson.find("Content-Type: application/json\r\n") != std::string::npos);
+    ASSERT_CONTAINS(resJson, "200 OK");
+    ASSERT_CONTAINS(resJson, "Content-Type: application/json\r\n");
 
     // PNG
     std::string resPng = runTransaction(client, sp, "GET /logo.png HTTP/1.1\r\nHost: localhost\r\n\r\n");
-    ASSERT_TRUE(resPng.find("200 OK") != std::string::npos);
-    ASSERT_TRUE(resPng.find("Content-Type: image/png\r\n") != std::string::npos);
+    ASSERT_CONTAINS(resPng, "200 OK");
+    ASSERT_CONTAINS(resPng, "Content-Type: image/png\r\n");
 }
 
 TEST(ClientIntegration_TestGetNonExistentFile404) {
@@ -250,8 +250,8 @@ TEST(ClientIntegration_TestGetNonExistentFile404) {
 
     std::string response = runTransaction(client, sp, "GET /nonexistent.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("404 Not Found") != std::string::npos);
+    ASSERT_CONTAINS(response, "404 Not Found\r\n");
+    ASSERT_CONTAINS(response, "404 Not Found");
 }
 
 TEST(ClientIntegration_TestGetDirectoryWithIndex) {
@@ -272,8 +272,8 @@ TEST(ClientIntegration_TestGetDirectoryWithIndex) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("<h1>Default Index Page</h1>") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "<h1>Default Index Page</h1>");
 }
 
 TEST(ClientIntegration_TestGetDirectoryNoIndexAutoindexOn) {
@@ -295,10 +295,10 @@ TEST(ClientIntegration_TestGetDirectoryNoIndexAutoindexOn) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Index of /") != std::string::npos);
-    ASSERT_TRUE(response.find("doc1.txt") != std::string::npos);
-    ASSERT_TRUE(response.find("doc2.txt") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Index of /");
+    ASSERT_CONTAINS(response, "doc1.txt");
+    ASSERT_CONTAINS(response, "doc2.txt");
 }
 
 TEST(ClientIntegration_TestGetDirectoryNoIndexAutoindexOff) {
@@ -319,7 +319,7 @@ TEST(ClientIntegration_TestGetDirectoryNoIndexAutoindexOff) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("403 Forbidden\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "403 Forbidden\r\n");
 }
 
 TEST(ClientIntegration_TestGetDirectoryMissingTrailingSlash) {
@@ -339,8 +339,8 @@ TEST(ClientIntegration_TestGetDirectoryMissingTrailingSlash) {
 
     std::string response = runTransaction(client, sp, "GET /downloads HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("301 Moved Permanently\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Location: /downloads/\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "301 Moved Permanently\r\n");
+    ASSERT_CONTAINS(response, "Location: /downloads/\r\n");
 }
 
 // =============================================================================
@@ -361,8 +361,8 @@ TEST(ClientIntegration_TestHttpRedirect301) {
 
     std::string response = runTransaction(client, sp, "GET /old-path HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("301 Moved Permanently\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Location: /new-path\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "301 Moved Permanently\r\n");
+    ASSERT_CONTAINS(response, "Location: /new-path\r\n");
 }
 
 TEST(ClientIntegration_TestHttpRedirect302) {
@@ -379,8 +379,8 @@ TEST(ClientIntegration_TestHttpRedirect302) {
 
     std::string response = runTransaction(client, sp, "GET /temp-redirect HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("302 Found\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Location: https://example.com/\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "302 Found\r\n");
+    ASSERT_CONTAINS(response, "Location: https://example.com/\r\n");
 }
 
 TEST(ClientIntegration_TestHttpRedirectInvalid500) {
@@ -397,7 +397,7 @@ TEST(ClientIntegration_TestHttpRedirectInvalid500) {
 
     std::string response = runTransaction(client, sp, "GET /bad-redirect HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("500 Internal Server Error\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "500 Internal Server Error\r\n");
 }
 
 // =============================================================================
@@ -424,7 +424,7 @@ TEST(ClientIntegration_TestRouteLongestPrefixMatch) {
     // A GET must be rejected with 405 Method Not Allowed!
     std::string response = runTransaction(client, sp, "GET /files/secure/data.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("405 Method Not Allowed\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "405 Method Not Allowed\r\n");
 }
 
 TEST(ClientIntegration_TestRouteNoMatch404) {
@@ -436,7 +436,7 @@ TEST(ClientIntegration_TestRouteNoMatch404) {
 
     std::string response = runTransaction(client, sp, "GET /anywhere HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "404 Not Found\r\n");
 }
 
 TEST(ClientIntegration_TestDisallowedMethod405) {
@@ -452,7 +452,7 @@ TEST(ClientIntegration_TestDisallowedMethod405) {
 
     std::string response = runTransaction(client, sp, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n");
 
-    ASSERT_TRUE(response.find("405 Method Not Allowed\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "405 Method Not Allowed\r\n");
 }
 
 // =============================================================================
@@ -477,8 +477,8 @@ TEST(ClientIntegration_TestCustomErrorPageFile) {
 
     std::string response = runTransaction(client, sp, "GET /missing.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("<h1>Custom Brand 404 Page</h1>") != std::string::npos);
+    ASSERT_CONTAINS(response, "404 Not Found\r\n");
+    ASSERT_CONTAINS(response, "<h1>Custom Brand 404 Page</h1>");
 }
 
 TEST(ClientIntegration_TestMissingCustomErrorPageFallback) {
@@ -495,8 +495,8 @@ TEST(ClientIntegration_TestMissingCustomErrorPageFallback) {
 
     std::string response = runTransaction(client, sp, "GET /missing.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("webserv") != std::string::npos);
+    ASSERT_CONTAINS(response, "404 Not Found\r\n");
+    ASSERT_CONTAINS(response, "webserv");
 }
 
 // =============================================================================
@@ -527,8 +527,8 @@ TEST(ClientIntegration_TestPostValidUpload) {
 
     std::string response = runTransaction(client, sp, request);
 
-    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Location: /upload/sample.txt\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "201 Created\r\n");
+    ASSERT_CONTAINS(response, "Location: /upload/sample.txt\r\n");
     ASSERT_TRUE(tmp.fileExists("uploads/sample.txt"));
     ASSERT_EQ(tmp.readFile("uploads/sample.txt"), "uploaded content");
 }
@@ -558,7 +558,7 @@ TEST(ClientIntegration_TestPostBinaryUpload) {
 
     std::string response = runTransaction(client, sp, fullRequest);
 
-    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "201 Created\r\n");
     ASSERT_TRUE(tmp.fileExists("uploads_bin/data.bin"));
     std::string readBack = tmp.readFile("uploads_bin/data.bin");
     ASSERT_EQ(readBack.size(), 6u);
@@ -585,7 +585,7 @@ TEST(ClientIntegration_TestPostNoUploadStore403) {
 
     std::string response = runTransaction(client, sp, request);
 
-    ASSERT_TRUE(response.find("403 Forbidden\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "403 Forbidden\r\n");
 }
 
 // =============================================================================
@@ -610,7 +610,7 @@ TEST(ClientIntegration_TestDeleteExistingFile) {
 
     std::string response = runTransaction(client, sp, "DELETE /remove_me.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("204 No Content\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "204 No Content\r\n");
     ASSERT_FALSE(tmp.fileExists("remove_me.txt"));
 }
 
@@ -633,7 +633,7 @@ TEST(ClientIntegration_TestDeleteNonExistentFile404AndUnremovable403) {
         client.setServer(server);
 
         std::string response = runTransaction(client, sp, "DELETE /already_gone.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        ASSERT_TRUE(response.find("404 Not Found\r\n") != std::string::npos);
+        ASSERT_CONTAINS(response, "404 Not Found\r\n");
     }
 
     // 2. Deleting an existing but unremovable path (non-empty directory) returns 403 Forbidden
@@ -643,7 +643,7 @@ TEST(ClientIntegration_TestDeleteNonExistentFile404AndUnremovable403) {
         client.setServer(server);
 
         std::string response = runTransaction(client, sp, "DELETE /non_empty_dir HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        ASSERT_TRUE(response.find("403 Forbidden\r\n") != std::string::npos);
+        ASSERT_CONTAINS(response, "403 Forbidden\r\n");
     }
 }
 
@@ -688,8 +688,8 @@ TEST(ClientIntegration_TestVirtualHostMatching) {
     // Request targetting special.org should route to serverSpecial
     std::string response = runTransaction(client, sp, "GET /site.txt HTTP/1.1\r\nHost: special.org\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Special VHost Site") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Special VHost Site");
 }
 
 TEST(ClientIntegration_TestVirtualHostPortStripping) {
@@ -716,8 +716,8 @@ TEST(ClientIntegration_TestVirtualHostPortStripping) {
     // "Host: test.com:8080" has port attached
     std::string response = runTransaction(client, sp, "GET /info.txt HTTP/1.1\r\nHost: test.com:8080\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Port Stripped Host Match") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Port Stripped Host Match");
 }
 
 TEST(ClientIntegration_TestVirtualHostFallbackDefault) {
@@ -743,8 +743,8 @@ TEST(ClientIntegration_TestVirtualHostFallbackDefault) {
 
     std::string response = runTransaction(client, sp, "GET /fallback.txt HTTP/1.1\r\nHost: unrecognized.net\r\n\r\n");
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Fallback Content") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Fallback Content");
 }
 
 // =============================================================================
@@ -757,7 +757,7 @@ TEST(ClientIntegration_TestHttp11MissingHostHeader400) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/1.1\r\nUser-Agent: test\r\n\r\n");
 
-    ASSERT_TRUE(response.find("400 Bad Request\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "400 Bad Request\r\n");
 }
 
 TEST(ClientIntegration_TestMaxBodySizeHeaderExceeded413) {
@@ -775,7 +775,7 @@ TEST(ClientIntegration_TestMaxBodySizeHeaderExceeded413) {
 
     std::string response = runTransaction(client, sp, request);
 
-    ASSERT_TRUE(response.find("413 Payload Too Large\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "413 Payload Too Large\r\n");
 }
 
 TEST(ClientIntegration_TestMalformedRequestLine400) {
@@ -784,7 +784,7 @@ TEST(ClientIntegration_TestMalformedRequestLine400) {
 
     std::string response = runTransaction(client, sp, "GET /\r\n\r\n");
 
-    ASSERT_TRUE(response.find("400 Bad Request\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "400 Bad Request\r\n");
 }
 
 TEST(ClientIntegration_TestUnsupportedHttpVersion505) {
@@ -793,7 +793,7 @@ TEST(ClientIntegration_TestUnsupportedHttpVersion505) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/2.0\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("505 HTTP Version Not Supported\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "505 HTTP Version Not Supported\r\n");
 }
 
 // =============================================================================
@@ -817,7 +817,7 @@ TEST(ClientIntegration_TestKeepAliveHttp11Default) {
 
     std::string response = runTransaction(client, sp, "GET /test.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: keep-alive\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: keep-alive\r\n");
     // After keep-alive write, client must reset to READING_HEADER for next request
     ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
 }
@@ -839,7 +839,7 @@ TEST(ClientIntegration_TestKeepAliveHttp11ExplicitClose) {
 
     std::string response = runTransaction(client, sp, "GET /test.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: close\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: close\r\n");
     ASSERT_EQ(client.getClientState(), Client::DONE);
 }
 
@@ -860,7 +860,7 @@ TEST(ClientIntegration_TestKeepAliveHttp10Default) {
 
     std::string response = runTransaction(client, sp, "GET /test.txt HTTP/1.0\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: close\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: close\r\n");
     ASSERT_EQ(client.getClientState(), Client::DONE);
 }
 
@@ -881,7 +881,7 @@ TEST(ClientIntegration_TestKeepAliveHttp10ExplicitKeepAlive) {
 
     std::string response = runTransaction(client, sp, "GET /test.txt HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: keep-alive\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: keep-alive\r\n");
     ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
 }
 
@@ -892,7 +892,7 @@ TEST(ClientIntegration_TestFatalErrorClosesConnection) {
     // 400 Bad Request forces connection close
     std::string response = runTransaction(client, sp, "GET /\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: close\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: close\r\n");
     ASSERT_EQ(client.getClientState(), Client::DONE);
 }
 
@@ -910,7 +910,7 @@ TEST(ClientIntegration_TestNonFatalErrorAllowsKeepAlive) {
     // 404 allows keep-alive on HTTP/1.1
     std::string response = runTransaction(client, sp, "GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_TRUE(response.find("Connection: keep-alive\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "Connection: keep-alive\r\n");
     ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
 }
 
@@ -953,8 +953,8 @@ TEST(ClientIntegration_TestSocketSplitHeaderRead) {
     client.handleWrite();
 
     std::string response = sp.readFromClient();
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("payload") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "payload");
 }
 
 TEST(ClientIntegration_TestSocketPostWithBody) {
@@ -988,7 +988,7 @@ TEST(ClientIntegration_TestSocketPostWithBody) {
     client.handleWrite();
 
     std::string response = sp.readFromClient();
-    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "201 Created\r\n");
     ASSERT_TRUE(tmp.fileExists("uploads/stream.txt"));
     ASSERT_EQ(tmp.readFile("uploads/stream.txt"), "streamedData");
 }
@@ -1042,7 +1042,7 @@ TEST(ClientIntegration_TestSocketPipelinedRequests) {
     client.handleWrite();
 
     std::string firstResponse = sp.readFromClient();
-    ASSERT_TRUE(firstResponse.find("First Response") != std::string::npos);
+    ASSERT_CONTAINS(firstResponse, "First Response");
 
     // After keep-alive reset, client must automatically parse second request from buffered bytes
     ASSERT_EQ(client.getClientState(), Client::PROCESSING);
@@ -1053,7 +1053,7 @@ TEST(ClientIntegration_TestSocketPipelinedRequests) {
     client.handleWrite();
 
     std::string secondResponse = sp.readFromClient();
-    ASSERT_TRUE(secondResponse.find("Second Response") != std::string::npos);
+    ASSERT_CONTAINS(secondResponse, "Second Response");
 }
 
 TEST(ClientIntegration_TestChunkedPostUploadAndStreamedChunks) {
@@ -1092,7 +1092,7 @@ TEST(ClientIntegration_TestChunkedPostUploadAndStreamedChunks) {
     client.handleWrite();
 
     std::string response = sp.readFromClient();
-    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "201 Created\r\n");
     ASSERT_TRUE(tmp.fileExists("uploads/chunked.txt"));
     ASSERT_EQ(tmp.readFile("uploads/chunked.txt"), "Hello World");
 }
@@ -1120,7 +1120,7 @@ TEST(ClientIntegration_TestChunkedPostInvalidHexReturns400) {
         "NOT_HEX\r\ndata\r\n0\r\n\r\n";
 
     std::string response = runTransaction(client, sp, badChunkedReq);
-    ASSERT_TRUE(response.find("400 Bad Request\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "400 Bad Request\r\n");
     ASSERT_EQ(client.getClientState(), Client::DONE);
 }
 
@@ -1145,7 +1145,7 @@ TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
         Client client1(sp1.clientFd());
         client1.setServer(server);
         std::string getResp = runTransaction(client1, sp1, "GET /locked.txt HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        ASSERT_TRUE(getResp.find("403 Forbidden\r\n") != std::string::npos);
+        ASSERT_CONTAINS(getResp, "403 Forbidden\r\n");
     }
     chmod(lockedFilePath.c_str(), 0644);
 
@@ -1157,7 +1157,7 @@ TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
         client2, sp2,
         "POST /item.txt HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\n\r\ndata"
     );
-    ASSERT_TRUE(postResp.find("403 Forbidden\r\n") != std::string::npos);
+    ASSERT_CONTAINS(postResp, "403 Forbidden\r\n");
 }
 
 // =============================================================================
@@ -1204,11 +1204,11 @@ TEST(ClientIntegration_TestCgiGetWithQueryStringAndHeaders) {
     std::ostringstream lenStream;
     lenStream << expectedBody.size();
 
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("Content-Type: text/plain\r\n") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "Content-Type: text/plain\r\n");
     // Subject IV.3: CGI did not return Content-Length; server marks end by EOF and sets Content-Length
-    ASSERT_TRUE(response.find("Content-Length: " + lenStream.str() + "\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find(expectedBody) != std::string::npos);
+    ASSERT_CONTAINS(response, "Content-Length: " + lenStream.str() + "\r\n");
+    ASSERT_CONTAINS(response, expectedBody);
     ASSERT_EQ(client.getClientState(), Client::READING_HEADER);
 }
 
@@ -1245,8 +1245,8 @@ TEST(ClientIntegration_TestCgiPostFixedContentLengthBody) {
 
     std::string response = runTransaction(client, sp, req);
 
-    ASSERT_TRUE(response.find("201 Created\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("CL=19;CT=application/x-www-form-urlencoded;DATA=user=jovana&team=42") != std::string::npos);
+    ASSERT_CONTAINS(response, "201 Created\r\n");
+    ASSERT_CONTAINS(response, "CL=19;CT=application/x-www-form-urlencoded;DATA=user=jovana&team=42");
 }
 
 TEST(ClientIntegration_TestCgiPostChunkedRequestUnchunkedToStdinEOF) {
@@ -1295,8 +1295,8 @@ TEST(ClientIntegration_TestCgiPostChunkedRequestUnchunkedToStdinEOF) {
     client.handleWrite();
 
     std::string response = sp.readFromClient();
-    ASSERT_TRUE(response.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(response.find("CL=16;TE=NONE;BODY=Unchunked Stream") != std::string::npos);
+    ASSERT_CONTAINS(response, "200 OK\r\n");
+    ASSERT_CONTAINS(response, "CL=16;TE=NONE;BODY=Unchunked Stream");
 }
 
 TEST(ClientIntegration_TestCgiRelativePathAccessAndRedirect) {
@@ -1332,16 +1332,16 @@ TEST(ClientIntegration_TestCgiRelativePathAccessAndRedirect) {
         client, sp,
         "GET /cgi-bin/scripts/read_local.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
     );
-    ASSERT_TRUE(resp1.find("200 OK\r\n") != std::string::npos);
-    ASSERT_TRUE(resp1.find("RelativeFileContentOK") != std::string::npos);
+    ASSERT_CONTAINS(resp1, "200 OK\r\n");
+    ASSERT_CONTAINS(resp1, "RelativeFileContentOK");
 
     // 2. CGI Location header redirect on the same keep-alive connection (RFC 3875 -> 302 Found)
     std::string resp2 = runTransaction(
         client, sp,
         "GET /cgi-bin/scripts/redirect.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
     );
-    ASSERT_TRUE(resp2.find("302 Found\r\n") != std::string::npos);
-    ASSERT_TRUE(resp2.find("Location: /new-home\r\n") != std::string::npos);
+    ASSERT_CONTAINS(resp2, "302 Found\r\n");
+    ASSERT_CONTAINS(resp2, "Location: /new-home\r\n");
 }
 
 TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
@@ -1367,7 +1367,7 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
             client, sp,
             "GET /cgi-bin/missing.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
         );
-        ASSERT_TRUE(resp.find("404 Not Found\r\n") != std::string::npos);
+        ASSERT_CONTAINS(resp, "404 Not Found\r\n");
     }
 
     // 2. CGI script exits with non-zero status -> 502 Bad Gateway
@@ -1379,7 +1379,7 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
             client, sp,
             "GET /cgi-bin/bad_exit.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
         );
-        ASSERT_TRUE(resp.find("502 Bad Gateway\r\n") != std::string::npos);
+        ASSERT_CONTAINS(resp, "502 Bad Gateway\r\n");
     }
 
     // 3. CGI script produces malformed output without header boundary -> 502 Bad Gateway
@@ -1391,7 +1391,7 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
             client, sp,
             "GET /cgi-bin/bad_output.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
         );
-        ASSERT_TRUE(resp.find("502 Bad Gateway\r\n") != std::string::npos);
+        ASSERT_CONTAINS(resp, "502 Bad Gateway\r\n");
     }
 
     // 4. Hanging CGI script -> handleCgiTimeout() produces 504 Gateway Timeout
@@ -1414,7 +1414,7 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
         client.handleWrite();
 
         std::string resp = sp.readFromClient();
-        ASSERT_TRUE(resp.find("504 Gateway Timeout\r\n") != std::string::npos);
+        ASSERT_CONTAINS(resp, "504 Gateway Timeout\r\n");
     }
 }
 

@@ -848,7 +848,7 @@ TEST(HttpRequest_TestMakeFullPath) {
     loc1.setRoot("/var/www/assets");
     HttpRequest req1;
     req1.setUri("/images/logo.png");
-    ASSERT_EQ(req1.makeFullPath(loc1), "/var/www/assets/logo.png");
+    ASSERT_EQ(req1.makeFullPath(loc1, loc1.getRoot()), "/var/www/assets/logo.png");
 
     // 2. Root WITH trailing slash (must strip trailing slash before joining)
     LocationConfig loc2;
@@ -856,7 +856,7 @@ TEST(HttpRequest_TestMakeFullPath) {
     loc2.setRoot("/var/www/assets/");
     HttpRequest req2;
     req2.setUri("/images/logo.png");
-    ASSERT_EQ(req2.makeFullPath(loc2), "/var/www/assets/logo.png");
+    ASSERT_EQ(req2.makeFullPath(loc2, loc2.getRoot()), "/var/www/assets/logo.png");
 
     // 3. Exact match between URI and location path (strippedUri is empty)
     LocationConfig loc3;
@@ -864,7 +864,7 @@ TEST(HttpRequest_TestMakeFullPath) {
     loc3.setRoot("/var/www/assets/");
     HttpRequest req3;
     req3.setUri("/images");
-    ASSERT_EQ(req3.makeFullPath(loc3), "/var/www/assets/");
+    ASSERT_EQ(req3.makeFullPath(loc3, loc3.getRoot()), "/var/www/assets/");
 
     // 4. Location path "/" with trailing slash in location path (strippedUri lacks leading '/')
     LocationConfig loc4;
@@ -872,7 +872,7 @@ TEST(HttpRequest_TestMakeFullPath) {
     loc4.setRoot("/var/www/html");
     HttpRequest req4;
     req4.setUri("/index.html");
-    ASSERT_EQ(req4.makeFullPath(loc4), "/var/www/html/index.html");
+    ASSERT_EQ(req4.makeFullPath(loc4, loc4.getRoot()), "/var/www/html/index.html");
 }
 
 

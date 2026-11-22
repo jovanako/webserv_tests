@@ -404,18 +404,18 @@ TEST(CgiExecutor_TestEnvironmentVariablesAndArgumentsPassedToChild) {
     ASSERT_TRUE(cgiResp.parse(executor.getOutputBuffer()));
     std::string body = vecToStr(cgiResp.getBody());
 
-    ASSERT_TRUE(body.find("GATEWAY_INTERFACE=CGI/1.1") != std::string::npos);
-    ASSERT_TRUE(body.find("REQUEST_METHOD=GET") != std::string::npos);
-    ASSERT_TRUE(body.find("QUERY_STRING=search=cgi&page=2") != std::string::npos);
-    ASSERT_TRUE(body.find("SCRIPT_NAME=/cgi-bin/env_dump.py") != std::string::npos);
-    ASSERT_TRUE(body.find("PATH_INFO=/extra/path") != std::string::npos);
-    ASSERT_TRUE(body.find("SERVER_NAME=localhost") != std::string::npos);
-    ASSERT_TRUE(body.find("SERVER_PORT=8080") != std::string::npos);
-    ASSERT_TRUE(body.find("SERVER_PROTOCOL=HTTP/1.1") != std::string::npos);
-    ASSERT_TRUE(body.find("REMOTE_ADDR=10.0.0.42") != std::string::npos);
-    ASSERT_TRUE(body.find("HTTP_USER_AGENT=WebservTester/2.0") != std::string::npos);
-    ASSERT_TRUE(body.find("HTTP_COOKIE=sid=xyz987") != std::string::npos);
-    ASSERT_TRUE(body.find("HTTP_X_CUSTOM_TOKEN=alpha-beta") != std::string::npos);
+    ASSERT_CONTAINS(body, "GATEWAY_INTERFACE=CGI/1.1");
+    ASSERT_CONTAINS(body, "REQUEST_METHOD=GET");
+    ASSERT_CONTAINS(body, "QUERY_STRING=search=cgi&page=2");
+    ASSERT_CONTAINS(body, "SCRIPT_NAME=/cgi-bin/env_dump.py");
+    ASSERT_CONTAINS(body, "PATH_INFO=/extra/path");
+    ASSERT_CONTAINS(body, "SERVER_NAME=localhost");
+    ASSERT_CONTAINS(body, "SERVER_PORT=8080");
+    ASSERT_CONTAINS(body, "SERVER_PROTOCOL=HTTP/1.1");
+    ASSERT_CONTAINS(body, "REMOTE_ADDR=10.0.0.42");
+    ASSERT_CONTAINS(body, "HTTP_USER_AGENT=WebservTester/2.0");
+    ASSERT_CONTAINS(body, "HTTP_COOKIE=sid=xyz987");
+    ASSERT_CONTAINS(body, "HTTP_X_CUSTOM_TOKEN=alpha-beta");
 }
 
 // =============================================================================
