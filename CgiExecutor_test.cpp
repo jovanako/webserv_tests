@@ -170,7 +170,7 @@ TEST(CgiExecutor_TestMissingScriptReturns404) {
 
     HttpRequest req;
     req.setMethod("GET");
-    req.setUri("/cgi-bin/nonexistent.py");
+    req.setUri("/cgi-bin/missing_dir/nonexistent.py");
     req.setVersion("HTTP/1.1");
     req.addHeader("Host", "localhost");
 

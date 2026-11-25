@@ -170,8 +170,18 @@ std::string readAllFromFd(int fd) {
 } // namespace
 
 // =============================================================================
-// 1. Copy Construction & Reference Semantics
+// 1. Default Construction, Copy Construction, Assignment & Pointer Semantics
 // =============================================================================
+
+TEST(CgiRequest_TestDefaultConstructor) {
+    CgiRequest cgi;
+
+    ASSERT_EQ(cgi.getExecutable(), "");
+    ASSERT_EQ(cgi.getScriptPath(), "");
+    ASSERT_EQ(cgi.getWorkingDirectory(), "");
+    ASSERT_TRUE(cgi.getEnvVars().empty());
+    ASSERT_TRUE(cgi.getBody() == NULL);
+}
 
 TEST(CgiRequest_TestCopyConstructorBasic) {
     ServerConfig srv = createDefaultServerConfig();
@@ -186,17 +196,18 @@ TEST(CgiRequest_TestCopyConstructorBasic) {
     ASSERT_EQ(copy.getExecutable(), original.getExecutable());
     ASSERT_EQ(copy.getScriptPath(), original.getScriptPath());
     ASSERT_EQ(copy.getWorkingDirectory(), original.getWorkingDirectory());
-    ASSERT_EQ(&copy.getBody(), &original.getBody());
-    ASSERT_EQ(&copy.getBody(), &req.getBody());
-    ASSERT_EQ(copy.getBody().getFd(), original.getBody().getFd());
-    ASSERT_EQ(copy.getBody().getSize(), original.getBody().getSize());
+    ASSERT_TRUE(copy.getBody() != NULL);
+    ASSERT_EQ(copy.getBody(), original.getBody());
+    ASSERT_EQ(copy.getBody(), &req.getBody());
+    ASSERT_EQ(copy.getBody()->getFd(), original.getBody()->getFd());
+    ASSERT_EQ(copy.getBody()->getSize(), original.getBody()->getSize());
     ASSERT_EQ(copy.getEnvVars().size(), original.getEnvVars().size());
     for (size_t i = 0; i < original.getEnvVars().size(); ++i) {
         ASSERT_EQ(copy.getEnvVars()[i], original.getEnvVars()[i]);
     }
 }
 
-TEST(CgiRequest_TestCopyConstructorWithBodyReference) {
+TEST(CgiRequest_TestCopyConstructorWithBodyPointer) {
     ServerConfig srv = createDefaultServerConfig();
     LocationConfig loc = createDefaultCgiLocation();
     HttpRequest req;
@@ -214,13 +225,43 @@ TEST(CgiRequest_TestCopyConstructorWithBodyReference) {
     ASSERT_EQ(copy.getExecutable(), "/usr/bin/php-cgi");
     ASSERT_EQ(copy.getScriptPath(), original.getScriptPath());
     ASSERT_EQ(copy.getWorkingDirectory(), original.getWorkingDirectory());
-    ASSERT_EQ(&copy.getBody(), &req.getBody());
-    ASSERT_EQ(copy.getBody().getFd(), req.getBody().getFd());
-    ASSERT_EQ(copy.getBody().getSize(), 4u);
+    ASSERT_TRUE(copy.getBody() != NULL);
+    ASSERT_EQ(copy.getBody(), &req.getBody());
+    ASSERT_EQ(copy.getBody()->getFd(), req.getBody().getFd());
+    ASSERT_EQ(copy.getBody()->getSize(), 4u);
     ASSERT_EQ(copy.getEnvVars().size(), original.getEnvVars().size());
     for (size_t i = 0; i < original.getEnvVars().size(); ++i) {
         ASSERT_EQ(copy.getEnvVars()[i], original.getEnvVars()[i]);
     }
+}
+
+TEST(CgiRequest_TestCopyAssignmentOperator) {
+    ServerConfig srv = createDefaultServerConfig();
+    LocationConfig loc = createDefaultCgiLocation();
+    HttpRequest req;
+    req.setMethod("POST");
+    req.setUri("/cgi-bin/assign.php");
+    req.setVersion("HTTP/1.1");
+    req.addHeader("Host", "example.com");
+    req.addHeader("Content-Length", "5");
+    req.appendBody("hello", 5);
+
+    CgiRequest original(srv, loc, req);
+    CgiRequest assigned;
+    ASSERT_TRUE(assigned.getBody() == NULL);
+
+    assigned = original;
+    ASSERT_EQ(assigned.getExecutable(), original.getExecutable());
+    ASSERT_EQ(assigned.getScriptPath(), original.getScriptPath());
+    ASSERT_EQ(assigned.getWorkingDirectory(), original.getWorkingDirectory());
+    ASSERT_EQ(assigned.getBody(), &req.getBody());
+    ASSERT_EQ(assigned.getBody()->getSize(), 5u);
+    ASSERT_EQ(assigned.getEnvVars().size(), original.getEnvVars().size());
+
+    // Self-assignment should preserve state
+    assigned = assigned;
+    ASSERT_EQ(assigned.getExecutable(), original.getExecutable());
+    ASSERT_EQ(assigned.getBody(), &req.getBody());
 }
 
 // =============================================================================
@@ -399,8 +440,10 @@ TEST(CgiRequest_TestPathInfoAbsentWhenNoExtraPath) {
     CgiRequest cgi(srv, loc, req);
     const std::vector<std::string>& envVars = cgi.getEnvVars();
 
-    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "");
-    ASSERT_FALSE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    // 42 tester compliance: PATH_INFO falls back to request URI when there is no extra path
+    ASSERT_EQ(getEnvValue(envVars, "PATH_INFO"), "/cgi-bin/script.py");
+    ASSERT_TRUE(hasEnvKey(envVars, "PATH_TRANSLATED"));
+    ASSERT_EQ(getEnvValue(envVars, "PATH_TRANSLATED"), "/var/www/cgi/cgi-bin/script.py");
 }
 
 TEST(CgiRequest_TestPathTranslatedWithTrailingSlashInLocationRoot) {
@@ -900,9 +943,10 @@ TEST(CgiRequest_TestBodyFdEmptyBodyReturnsMinusOne) {
 
     CgiRequest cgi(srv, loc, req);
 
-    ASSERT_TRUE(cgi.getBody().empty());
-    ASSERT_EQ(cgi.getBody().getSize(), 0u);
-    ASSERT_EQ(cgi.getBody().getFd(), -1);
+    ASSERT_TRUE(cgi.getBody() != NULL);
+    ASSERT_TRUE(cgi.getBody()->empty());
+    ASSERT_EQ(cgi.getBody()->getSize(), 0u);
+    ASSERT_EQ(cgi.getBody()->getFd(), -1);
 }
 
 TEST(CgiRequest_TestBodyFdNonEmptyBodyProvidesReadableFd) {
@@ -919,9 +963,10 @@ TEST(CgiRequest_TestBodyFdNonEmptyBodyProvidesReadableFd) {
 
     CgiRequest cgi(srv, loc, req);
 
-    ASSERT_FALSE(cgi.getBody().empty());
-    ASSERT_EQ(cgi.getBody().getSize(), payload.size());
-    int fd = cgi.getBody().getFd();
+    ASSERT_TRUE(cgi.getBody() != NULL);
+    ASSERT_FALSE(cgi.getBody()->empty());
+    ASSERT_EQ(cgi.getBody()->getSize(), payload.size());
+    int fd = cgi.getBody()->getFd();
     ASSERT_TRUE(isValidBodyFd(fd));
 
     std::string readBack = readAllFromFd(fd);
@@ -942,9 +987,10 @@ TEST(CgiRequest_TestBodyFdBinaryBodyPreservesNullBytes) {
 
     CgiRequest cgi(srv, loc, req);
 
-    ASSERT_FALSE(cgi.getBody().empty());
-    ASSERT_EQ(cgi.getBody().getSize(), sizeof(rawBytes));
-    int fd = cgi.getBody().getFd();
+    ASSERT_TRUE(cgi.getBody() != NULL);
+    ASSERT_FALSE(cgi.getBody()->empty());
+    ASSERT_EQ(cgi.getBody()->getSize(), sizeof(rawBytes));
+    int fd = cgi.getBody()->getFd();
     ASSERT_TRUE(isValidBodyFd(fd));
 
     std::string readBack = readAllFromFd(fd);
@@ -1009,8 +1055,9 @@ TEST(CgiRequest_TestConstGetters) {
     ASSERT_EQ(constCgi.getScriptPath(), "/var/www/cgi/const_check.py");
     ASSERT_EQ(constCgi.getWorkingDirectory(), "/var/www/cgi");
     ASSERT_FALSE(constCgi.getEnvVars().empty());
-    ASSERT_TRUE(constCgi.getBody().empty());
-    ASSERT_EQ(constCgi.getBody().getFd(), -1);
+    ASSERT_TRUE(constCgi.getBody() != NULL);
+    ASSERT_TRUE(constCgi.getBody()->empty());
+    ASSERT_EQ(constCgi.getBody()->getFd(), -1);
     ASSERT_EQ(constCgi.buildArgv().size(), 3u);
     ASSERT_EQ(constCgi.buildEnvp().size(), constCgi.getEnvVars().size() + 1);
 }

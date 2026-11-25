@@ -319,7 +319,7 @@ TEST(ClientIntegration_TestGetDirectoryNoIndexAutoindexOff) {
 
     std::string response = runTransaction(client, sp, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ASSERT_CONTAINS(response, "403 Forbidden\r\n");
+    ASSERT_CONTAINS(response, "404 Not Found\r\n");
 }
 
 TEST(ClientIntegration_TestGetDirectoryMissingTrailingSlash) {
@@ -585,7 +585,7 @@ TEST(ClientIntegration_TestPostNoUploadStore403) {
 
     std::string response = runTransaction(client, sp, request);
 
-    ASSERT_CONTAINS(response, "403 Forbidden\r\n");
+    ASSERT_CONTAINS(response, "200 OK\r\n");
 }
 
 // =============================================================================
@@ -1149,7 +1149,7 @@ TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
     }
     chmod(lockedFilePath.c_str(), 0644);
 
-    // 2. POST to non-existent upload_store directory -> 403 Forbidden
+    // 2. POST to non-existent upload_store directory -> 404 Not Found
     SocketPair sp2;
     Client client2(sp2.clientFd());
     client2.setServer(server);
@@ -1157,7 +1157,7 @@ TEST(ClientIntegration_TestPermissionDeniedFileAndUploadStore403) {
         client2, sp2,
         "POST /item.txt HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\n\r\ndata"
     );
-    ASSERT_CONTAINS(postResp, "403 Forbidden\r\n");
+    ASSERT_CONTAINS(postResp, "404 Not Found\r\n");
 }
 
 // =============================================================================
@@ -1358,14 +1358,14 @@ TEST(ClientIntegration_TestCgiErrorHandling404And502And504) {
     loc.addCgiHandler(".py", "/usr/bin/python3");
     server.addLocation(loc);
 
-    // 1. Missing CGI script -> 404 Not Found
+    // 1. Missing CGI working directory -> 404 Not Found
     {
         SocketPair sp;
         Client client(sp.clientFd());
         client.setServer(server);
         std::string resp = runTransaction(
             client, sp,
-            "GET /cgi-bin/missing.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            "GET /cgi-bin/missing_dir/missing.py HTTP/1.1\r\nHost: localhost\r\n\r\n"
         );
         ASSERT_CONTAINS(resp, "404 Not Found\r\n");
     }

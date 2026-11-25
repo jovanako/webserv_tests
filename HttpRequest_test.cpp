@@ -166,35 +166,35 @@ TEST(HttpRequest_TestSetMethodInvalidCharacters) {
 }
 
 TEST(HttpRequest_TestSetMethodUnsupported) {
-    // Valid HTTP token characters, but method is not implemented (501 Not Implemented)
+    // Valid HTTP token characters, but method is not allowed (405 Method Not Allowed)
     HttpRequest req1;
     req1.setMethod("PUT");
-    ASSERT_EQ(req1.getErrorCode(), 501);
+    ASSERT_EQ(req1.getErrorCode(), 405);
     ASSERT_EQ(req1.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req2;
     req2.setMethod("HEAD");
-    ASSERT_EQ(req2.getErrorCode(), 501);
+    ASSERT_EQ(req2.getErrorCode(), 405);
     ASSERT_EQ(req2.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req3;
     req3.setMethod("OPTIONS");
-    ASSERT_EQ(req3.getErrorCode(), 501);
+    ASSERT_EQ(req3.getErrorCode(), 405);
     ASSERT_EQ(req3.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req4;
     req4.setMethod("PATCH");
-    ASSERT_EQ(req4.getErrorCode(), 501);
+    ASSERT_EQ(req4.getErrorCode(), 405);
     ASSERT_EQ(req4.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req5;
     req5.setMethod("CUSTOM");
-    ASSERT_EQ(req5.getErrorCode(), 501);
+    ASSERT_EQ(req5.getErrorCode(), 405);
     ASSERT_EQ(req5.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req6;
     req6.setMethod("");
-    ASSERT_EQ(req6.getErrorCode(), 501);
+    ASSERT_EQ(req6.getErrorCode(), 405);
     ASSERT_EQ(req6.getRequestState(), HttpRequest::PARSE_ERROR);
 }
 
@@ -362,25 +362,25 @@ TEST(HttpRequest_TestSetUriInvalidFormat) {
 }
 
 TEST(HttpRequest_TestSetUriPathTraversalSecurity) {
-    // Sequences allowing directory climbing must be rejected with 403 Forbidden
+    // Sequences allowing directory climbing must be rejected with 400 Bad Request
     HttpRequest req1;
     req1.setUri("/../etc/passwd");
-    ASSERT_EQ(req1.getErrorCode(), 403);
+    ASSERT_EQ(req1.getErrorCode(), 400);
     ASSERT_EQ(req1.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req2;
     req2.setUri("/sub/../secret");
-    ASSERT_EQ(req2.getErrorCode(), 403);
+    ASSERT_EQ(req2.getErrorCode(), 400);
     ASSERT_EQ(req2.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req3;
     req3.setUri("/path/..");
-    ASSERT_EQ(req3.getErrorCode(), 403);
+    ASSERT_EQ(req3.getErrorCode(), 400);
     ASSERT_EQ(req3.getRequestState(), HttpRequest::PARSE_ERROR);
 
     HttpRequest req4;
     req4.setUri("/path/..?query=val");
-    ASSERT_EQ(req4.getErrorCode(), 403);
+    ASSERT_EQ(req4.getErrorCode(), 400);
     ASSERT_EQ(req4.getRequestState(), HttpRequest::PARSE_ERROR);
 }
 
@@ -747,7 +747,7 @@ TEST(HttpRequest_TestRewindAndResetBody) {
     ASSERT_NE(req.getBody().getFd(), -1);
     ASSERT_TRUE(req.rewindBody());
 
-    req.resetBody();
+    req = HttpRequest();
     ASSERT_TRUE(req.getBody().empty());
     ASSERT_EQ(req.getBody().getSize(), 0u);
     ASSERT_EQ(req.getBody().getFd(), -1);

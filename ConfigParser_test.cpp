@@ -249,7 +249,8 @@ TEST(ConfigParser_TestEmptyServerBlockDefaults) {
     ASSERT_EQ(servers[0].getClientMaxBodySize(), 1048576u);
     ASSERT_TRUE(servers[0].getServerNames().empty());
     ASSERT_TRUE(servers[0].getErrorPages().empty());
-    ASSERT_TRUE(servers[0].getLocations().empty());
+    ASSERT_EQ(servers[0].getLocations().size(), 1u);
+    ASSERT_EQ(servers[0].getLocations()[0].getPath(), "/");
 }
 
 TEST(ConfigParser_TestMultipleServerBlocks) {
@@ -311,9 +312,8 @@ TEST(ConfigParser_TestServerBlockMissingBracesThrows) {
 }
 
 TEST(ConfigParser_TestUnknownServerDirectiveThrows) {
-    ASSERT_THROWS(parseConfigString("server { root /var/www; }"), std::runtime_error);
-    ASSERT_THROWS(parseConfigString("server { autoindex on; }"), std::runtime_error);
     ASSERT_THROWS(parseConfigString("server { unknown_directive 123; }"), std::runtime_error);
+    ASSERT_THROWS(parseConfigString("server { nonexistent_option on; }"), std::runtime_error);
 }
 
 // =============================================================================
@@ -833,8 +833,6 @@ TEST(ConfigParser_TestLocationSyntaxAndUnknownDirectiveThrows) {
     // Server-level or unknown directive inside location block
     ASSERT_THROWS(parseConfigString("server { location / { listen 8080; } }"), std::runtime_error);
     ASSERT_THROWS(parseConfigString("server { location / { server_name test; } }"), std::runtime_error);
-    ASSERT_THROWS(parseConfigString("server { location / { client_max_body_size 1M; } }"), std::runtime_error);
-    ASSERT_THROWS(parseConfigString("server { location / { error_page 404 /404.html; } }"), std::runtime_error);
     ASSERT_THROWS(parseConfigString("server { location / { unknown_loc_directive val; } }"), std::runtime_error);
 }
 

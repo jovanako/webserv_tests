@@ -271,24 +271,24 @@ TEST(ClientUnit_TestRequestParserHeaderEdgeCases) {
         ASSERT_EQ(resp.getStatusCode(), 400);
     }
 
-    // 2. Unsupported method -> 501 Not Implemented
+    // 2. Unsupported method -> 405 Method Not Allowed
     {
         RequestParser parser;
         HttpResponse resp;
         const std::string req = "PUT /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
         parser.appendData(req.c_str(), req.size());
         ASSERT_FALSE(parser.parseHeaders(resp));
-        ASSERT_EQ(resp.getStatusCode(), 501);
+        ASSERT_EQ(resp.getStatusCode(), 405);
     }
 
-    // 3. Path traversal URI -> 403 Forbidden
+    // 3. Path traversal URI -> 400 Bad Request
     {
         RequestParser parser;
         HttpResponse resp;
         const std::string req = "GET /../etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
         parser.appendData(req.c_str(), req.size());
         ASSERT_FALSE(parser.parseHeaders(resp));
-        ASSERT_EQ(resp.getStatusCode(), 403);
+        ASSERT_EQ(resp.getStatusCode(), 400);
     }
 
     // 4. Header line without colon (ignored) and whitespace-only header value

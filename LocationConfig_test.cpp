@@ -86,7 +86,6 @@ TEST(LocationConfig_TestCopyConstructorIndependence) {
     original.setRedirect(307, "/mutated-redirect");
     original.addIndex("extra.html");
     original.addAllowedMethod("DELETE");
-    original.addCgiHandler(".py", "/usr/local/bin/python3");
     original.addCgiHandler(".sh", "/bin/bash");
 
     ASSERT_EQ(copy.getPath(), "/static");
@@ -171,7 +170,6 @@ TEST(LocationConfig_TestAssignmentOperatorIndependence) {
     original.setAutoindex(true);
     original.addIndex("v2.json");
     original.addAllowedMethod("POST");
-    original.addCgiHandler(".py", "/usr/bin/pypy3");
     original.addCgiHandler(".php", "/usr/bin/php-cgi");
 
     ASSERT_EQ(assigned.getPath(), "/api");
@@ -470,16 +468,16 @@ TEST(LocationConfig_TestAddCgiHandlerMultipleDistinct) {
     ASSERT_EQ(handlers.find(".pl")->second, "/usr/bin/perl");
 }
 
-TEST(LocationConfig_TestAddCgiHandlerOverwriteExistingExtension) {
+TEST(LocationConfig_TestAddCgiHandlerDuplicateExtensionThrows) {
     LocationConfig loc;
     loc.addCgiHandler(".py", "/usr/bin/python2");
     ASSERT_EQ(loc.getCgiHandlers().size(), 1u);
     ASSERT_EQ(loc.getCgiHandlers().find(".py")->second, "/usr/bin/python2");
 
-    // Adding a handler for the same extension must overwrite the previous interpreter path
-    loc.addCgiHandler(".py", "/usr/bin/python3");
+    // Adding a duplicate handler for the same extension must throw and preserve the original
+    ASSERT_THROWS(loc.addCgiHandler(".py", "/usr/bin/python3"), std::runtime_error);
     ASSERT_EQ(loc.getCgiHandlers().size(), 1u);
-    ASSERT_EQ(loc.getCgiHandlers().find(".py")->second, "/usr/bin/python3");
+    ASSERT_EQ(loc.getCgiHandlers().find(".py")->second, "/usr/bin/python2");
 }
 
 TEST(LocationConfig_TestResolveScriptNameAndGetCgiHandler) {
