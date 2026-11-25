@@ -620,7 +620,7 @@ TEST(CgiExecutor_TestScriptKilledBySignalReturns502) {
     TempDir tmp;
     tmp.createFile("crash.py",
         "import os, signal\n"
-        "os.kill(os.getpid(), signal.SIGSEGV)\n"
+        "os.kill(os.getpid(), signal.SIGKILL)\n"
     );
 
     ServerConfig srv = makeServerConfig();
